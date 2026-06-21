@@ -1,0 +1,17 @@
+Backend Engineer
+
+We are looking for a backend engineer to build and maintain production APIs for
+internal product teams.
+
+Responsibilities
+
+- Build backend APIs using Python.
+- Design REST services with FastAPI or similar frameworks.
+- Work with PostgreSQL-backed application data.
+- Write automated tests for backend services.
+- Deploy containerized services to Kubernetes.
+
+Preferred Qualifications
+
+- Experience collaborating with product and data teams.
+- Familiarity with Docker, CI/CD, and cloud deployment workflows.

@@ -1,0 +1,22 @@
+Sample Candidate
+
+Summary
+Backend-focused software engineer with experience building Python services,
+internal APIs, and data-backed product workflows.
+
+Skills
+Python, FastAPI, PostgreSQL, pytest, Docker, React
+
+Experience
+
+Acme Analytics - Software Engineer
+2024-01 - Present
+
+- [exp_1_bullet_1] Built internal REST APIs using Python and FastAPI to support analyst workflows.
+- [exp_1_bullet_2] Designed PostgreSQL tables and queries for customer reporting data.
+- [exp_1_bullet_3] Added pytest coverage for service-layer validation and API error handling.
+
+Campus Projects - Full-Stack Developer
+2023-01 - 2023-12
+
+- [exp_2_bullet_1] Built a React dashboard for reviewing uploaded documents and extracted metadata.

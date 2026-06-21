@@ -1,0 +1,18 @@
+[project]
+name = "agentic-resume"
+version = "0.1.0"
+description = "Evidence-grounded resume tailoring assistant"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pydantic>=2.13.4",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

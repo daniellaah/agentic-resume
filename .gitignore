@@ -34,6 +34,9 @@ data/generated/
 *.log
 logs/
 
+# Local scratch notebooks
+.scratch/
+
 # macOS and editor files
 .DS_Store
 .idea/

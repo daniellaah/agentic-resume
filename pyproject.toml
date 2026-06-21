@@ -5,14 +5,19 @@ description = "Evidence-grounded resume tailoring assistant"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "openai>=2.43.0",
     "pydantic>=2.13.4",
 ]
 
 [dependency-groups]
 dev = [
+    "ipykernel>=7.3.0",
     "pytest>=9.1.1",
 ]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+markers = [
+    "integration: tests that call external services and are skipped by default",
+]

@@ -39,10 +39,25 @@ Run a sample tailoring request:
 bash examples/curl_tailor.sh
 ```
 
+## Run the Trace Viewer
+
+```bash
+cd frontend
+npm ci
+AGENTIC_RESUME_API_URL=http://127.0.0.1:8000 npm run dev
+```
+
+Open:
+
+```text
+http://127.0.0.1:3000
+```
+
 ## Test
 
 ```bash
 uv run ruff check .
 uv run ruff format --check .
 uv run pytest -q
+cd frontend && npm run typecheck && npm run build
 ```

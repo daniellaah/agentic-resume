@@ -19,6 +19,17 @@ services:
       postgres:
         condition: service_healthy
 
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      AGENTIC_RESUME_API_URL: http://api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_started
+
   worker:
     build: .
     command: python -m app.worker

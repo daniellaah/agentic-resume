@@ -34,6 +34,11 @@ data/generated/
 *.log
 logs/
 
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
 # Local scratch notebooks
 .scratch/
 

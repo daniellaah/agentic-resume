@@ -10,6 +10,7 @@ from app.job_analysis import (
 from app.job_analysis import (
     MissingOpenAIAPIKeyError as MissingJobAnalysisOpenAIAPIKeyError,
 )
+from app.resume_input import ResumeInputError
 from app.rewrite_generator import (
     MissingOpenAIAPIKeyError as MissingRewriteOpenAIAPIKeyError,
 )
@@ -84,6 +85,7 @@ def tailor(
             detail=str(error),
         ) from error
     except (
+        ResumeInputError,
         EmptyJobDescriptionError,
         JobAnalysisOutputError,
         RewriteOutputError,

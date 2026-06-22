@@ -17,7 +17,13 @@ from app.models import (
     ResumeExperience,
     RewriteSuggestion,
 )
-from app.tailoring import TailoringMetadata, TailoringResult
+from app.resume_input import ResumeInputError
+from app.tailoring import (
+    DEFAULT_RESUME_INPUT_FORMAT,
+    PIPELINE_VERSION,
+    TailoringMetadata,
+    TailoringResult,
+)
 
 
 @pytest.fixture
@@ -31,8 +37,8 @@ def client():
 def make_tailoring_result() -> TailoringResult:
     return TailoringResult(
         metadata=TailoringMetadata(
-            pipeline_version="v4.1",
-            resume_input_format="structured_sample_resume",
+            pipeline_version=PIPELINE_VERSION,
+            resume_input_format=DEFAULT_RESUME_INPUT_FORMAT,
         ),
         resume=Resume(
             experience=[
@@ -115,8 +121,8 @@ def test_tailor_returns_pipeline_result_with_dependency_override(client: TestCli
 
     payload = response.json()
     assert payload["metadata"] == {
-        "pipeline_version": "v4.1",
-        "resume_input_format": "structured_sample_resume",
+        "pipeline_version": PIPELINE_VERSION,
+        "resume_input_format": DEFAULT_RESUME_INPUT_FORMAT,
     }
     assert payload["status"] == "success"
     assert payload["job_analysis"]["job_title"] == "Backend Engineer"
@@ -139,7 +145,7 @@ def test_tailor_maps_application_input_errors_to_400(client: TestClient):
         resume_text: str,
         job_description_text: str,
     ) -> TailoringResult:
-        raise ValueError("Invalid structured resume text.")
+        raise ResumeInputError("Invalid structured resume text.")
 
     app.dependency_overrides[get_tailoring_service] = lambda: fake_tailoring_service
 

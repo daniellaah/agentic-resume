@@ -1,6 +1,10 @@
 from pathlib import Path
 
-from app.tailoring import tailor_resume_to_job
+from app.tailoring import (
+    DEFAULT_RESUME_INPUT_FORMAT,
+    PIPELINE_VERSION,
+    tailor_resume_to_job,
+)
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
@@ -87,8 +91,8 @@ def test_v4_flow_returns_complete_tailoring_result_without_network_access():
     )
 
     assert result.status == "success"
-    assert result.metadata.pipeline_version == "v4.1"
-    assert result.metadata.resume_input_format == "structured_sample_resume"
+    assert result.metadata.pipeline_version == PIPELINE_VERSION
+    assert result.metadata.resume_input_format == DEFAULT_RESUME_INPUT_FORMAT
     assert result.validation_issues == []
     assert result.resume.experience
     assert result.job_analysis.job_title == "Backend Engineer"

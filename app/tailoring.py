@@ -12,7 +12,7 @@ from app.models import (
     RewriteSuggestion,
     ValidationIssue,
 )
-from app.parsers import parse_sample_resume
+from app.resume_input import SUPPORTED_RESUME_INPUT_FORMAT, parse_resume_text
 from app.rewrite_generator import (
     RewritePayloadProvider,
     UnsafeRewriteError,
@@ -22,8 +22,8 @@ from app.validator import validate_resume_tailoring
 
 TailoringStatus = Literal["success", "completed_with_warnings", "failed_validation"]
 ResumeParser = Callable[[str], Resume]
-PIPELINE_VERSION = "v4.1"
-DEFAULT_RESUME_INPUT_FORMAT = "structured_sample_resume"
+PIPELINE_VERSION = "v6"
+DEFAULT_RESUME_INPUT_FORMAT = SUPPORTED_RESUME_INPUT_FORMAT
 
 
 class TailoringMetadata(BaseModel):
@@ -45,7 +45,7 @@ def tailor_resume_to_job(
     resume_text: str,
     jd_text: str,
     *,
-    resume_parser: ResumeParser = parse_sample_resume,
+    resume_parser: ResumeParser = parse_resume_text,
     job_analysis_provider: JobAnalysisPayloadProvider | None = None,
     rewrite_provider: RewritePayloadProvider | None = None,
 ) -> TailoringResult:

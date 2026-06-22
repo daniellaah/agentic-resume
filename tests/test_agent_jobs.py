@@ -159,7 +159,7 @@ def test_execute_agentic_tailoring_job_persists_successful_agent_run():
     assert saved_job.status == "succeeded"
     assert saved_job.run_id == saved_run.id
     assert saved_run.workflow_version == AGENT_WORKFLOW_VERSION
-    assert saved_run.plan_id == "resume_tailoring_v13"
+    assert saved_run.plan_id == "resume_tailoring_v14"
 
 
 def test_execute_agentic_tailoring_job_marks_job_failed_on_error():

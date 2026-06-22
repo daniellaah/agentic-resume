@@ -1,14 +1,29 @@
-from collections.abc import Callable
+from collections.abc import Callable, Generator
+from functools import lru_cache
+from os import environ
 
 from fastapi import Depends, FastAPI, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
+from redis import Redis
+from rq import Queue
+from sqlalchemy.orm import Session
 
+from app.agent_jobs import (
+    AgenticTailoringJobRequest,
+    enqueue_agentic_tailoring_job,
+)
 from app.job_analysis import (
     EmptyJobDescriptionError,
     JobAnalysisOutputError,
 )
 from app.job_analysis import (
     MissingOpenAIAPIKeyError as MissingJobAnalysisOpenAIAPIKeyError,
+)
+from app.persistence import (
+    DEFAULT_DATABASE_URL,
+    AgentRunJobRecord,
+    create_database_engine,
+    create_session_factory,
 )
 from app.resume_input import ResumeInputError
 from app.rewrite_generator import (
@@ -22,6 +37,8 @@ from app.tailoring_agent import AgenticTailoringResult, tailor_resume_to_job_age
 
 TailoringService = Callable[[str, str], TailoringResult]
 AgenticTailoringService = Callable[[str, str, int], AgenticTailoringResult]
+AGENT_JOB_QUEUE_NAME = "agentic-tailoring"
+DEFAULT_REDIS_URL = "redis://localhost:6379/0"
 
 
 class HealthResponse(BaseModel):
@@ -42,6 +59,23 @@ class TailorRequest(BaseModel):
 
 class AgenticTailorRequest(TailorRequest):
     max_attempts: int = Field(default=2, ge=1, le=3)
+
+
+class AgentRunJobResponse(BaseModel):
+    job_id: str
+    rq_job_id: str | None = None
+    status: str
+    run_id: str | None = None
+    error_message: str | None = None
+
+
+class AgentRunTraceResponse(BaseModel):
+    job: AgentRunJobResponse
+    plan: dict | None = None
+    steps: list[dict] = Field(default_factory=list)
+    decisions: list[dict] = Field(default_factory=list)
+    attempts: list[dict] = Field(default_factory=list)
+    final_result: dict | None = None
 
 
 app = FastAPI(
@@ -80,8 +114,28 @@ def get_agentic_tailoring_service() -> AgenticTailoringService:
     return default_agentic_tailoring_service
 
 
+@lru_cache
+def get_database_engine():
+    return create_database_engine(environ.get("DATABASE_URL", DEFAULT_DATABASE_URL))
+
+
+def get_database_session() -> Generator[Session]:
+    session_factory = create_session_factory(get_database_engine())
+    with session_factory() as session:
+        yield session
+
+
+def get_agent_job_queue() -> Queue:
+    return Queue(
+        AGENT_JOB_QUEUE_NAME,
+        connection=Redis.from_url(environ.get("REDIS_URL", DEFAULT_REDIS_URL)),
+    )
+
+
 TAILORING_SERVICE_DEPENDENCY = Depends(get_tailoring_service)
 AGENTIC_TAILORING_SERVICE_DEPENDENCY = Depends(get_agentic_tailoring_service)
+DATABASE_SESSION_DEPENDENCY = Depends(get_database_session)
+AGENT_JOB_QUEUE_DEPENDENCY = Depends(get_agent_job_queue)
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -150,3 +204,88 @@ def tailor_agentic(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(error),
         ) from error
+
+
+@app.post(
+    "/agent-runs",
+    response_model=AgentRunJobResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def create_agent_run(
+    request: AgenticTailoringJobRequest,
+    queue: Queue = AGENT_JOB_QUEUE_DEPENDENCY,
+    session: Session = DATABASE_SESSION_DEPENDENCY,
+) -> AgentRunJobResponse:
+    try:
+        enqueue_result = enqueue_agentic_tailoring_job(
+            queue,
+            session,
+            request,
+            database_url=environ.get("DATABASE_URL", DEFAULT_DATABASE_URL),
+        )
+        session.commit()
+    except Exception as error:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
+
+    job_record = session.get(AgentRunJobRecord, enqueue_result.job_id)
+    if job_record is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Agent run job was enqueued but not persisted.",
+        )
+    return _agent_run_job_response(job_record)
+
+
+@app.get("/agent-runs/{job_id}", response_model=AgentRunJobResponse)
+def get_agent_run(
+    job_id: str,
+    session: Session = DATABASE_SESSION_DEPENDENCY,
+) -> AgentRunJobResponse:
+    return _agent_run_job_response(_get_agent_run_job_or_404(session, job_id))
+
+
+@app.get("/agent-runs/{job_id}/trace", response_model=AgentRunTraceResponse)
+def get_agent_run_trace(
+    job_id: str,
+    session: Session = DATABASE_SESSION_DEPENDENCY,
+) -> AgentRunTraceResponse:
+    job_record = _get_agent_run_job_or_404(session, job_id)
+    run = job_record.run
+    if run is None:
+        return AgentRunTraceResponse(job=_agent_run_job_response(job_record))
+
+    return AgentRunTraceResponse(
+        job=_agent_run_job_response(job_record),
+        plan=run.plan_json,
+        steps=[step.step_json for step in run.steps],
+        decisions=[decision.decision_json for decision in run.decisions],
+        attempts=[attempt.attempt_json for attempt in run.attempts],
+        final_result=run.final_result_json,
+    )
+
+
+def _get_agent_run_job_or_404(
+    session: Session,
+    job_id: str,
+) -> AgentRunJobRecord:
+    job_record = session.get(AgentRunJobRecord, job_id)
+    if job_record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Agent run job not found.",
+        )
+    return job_record
+
+
+def _agent_run_job_response(job_record: AgentRunJobRecord) -> AgentRunJobResponse:
+    return AgentRunJobResponse(
+        job_id=job_record.id,
+        rq_job_id=job_record.rq_job_id,
+        status=job_record.status,
+        run_id=job_record.run_id,
+        error_message=job_record.error_message,
+    )

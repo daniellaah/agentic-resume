@@ -8,6 +8,7 @@ from app.job_analysis import (
 from app.job_analysis import (
     MissingOpenAIAPIKeyError as MissingJobAnalysisOpenAIAPIKeyError,
 )
+from app.llm_backend import LLMProviderRequestError
 from app.models import (
     EvidenceMatch,
     JobAnalysis,
@@ -201,3 +202,24 @@ def test_tailor_maps_missing_openai_api_key_to_503(client: TestClient):
 
     assert response.status_code == 503
     assert response.json() == {"detail": "OPENAI_API_KEY must be set."}
+
+
+def test_tailor_maps_llm_provider_request_errors_to_503(client: TestClient):
+    def fake_tailoring_service(
+        resume_text: str,
+        job_description_text: str,
+    ) -> TailoringResult:
+        raise LLMProviderRequestError("Ollama request failed.")
+
+    app.dependency_overrides[get_tailoring_service] = lambda: fake_tailoring_service
+
+    response = client.post(
+        "/tailor",
+        json={
+            "resume_text": "resume text",
+            "job_description_text": "Backend Engineer JD",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Ollama request failed."}

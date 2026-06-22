@@ -27,6 +27,11 @@ def test_docker_compose_defines_api_worker_redis_and_postgres_services():
     assert "python -m app.worker" in compose
     assert "alembic upgrade head" in compose
     assert "AGENTIC_RESUME_API_URL: http://api:8000" in compose
+    assert "LLM_BACKEND: ${LLM_BACKEND:-openai}" in compose
+    assert "OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}" in (
+        compose
+    )
+    assert "OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:latest}" in compose
     assert '"3000:3000"' in compose
     assert "postgresql+psycopg://agentic_resume" in compose
     assert "redis://redis:6379/0" in compose
@@ -92,6 +97,11 @@ def test_frontend_dockerfile_builds_standalone_next_app():
 def test_env_example_includes_runtime_connection_settings():
     env_example = (ROOT_DIR / ".env.example").read_text()
 
+    assert "LLM_BACKEND=openai" in env_example
+    assert "OLLAMA_BASE_URL=http://host.docker.internal:11434" in env_example
+    assert "OLLAMA_MODEL=llama3.2:latest" in env_example
+    assert "OLLAMA_TIMEOUT_SECONDS=120" in env_example
+    assert "RUN_OLLAMA_INTEGRATION=0" in env_example
     assert "DATABASE_URL=sqlite:///agentic_resume.db" in env_example
     assert "REDIS_URL=redis://localhost:6379/0" in env_example
     assert "AGENT_JOB_QUEUE_NAME=agentic-tailoring" in env_example

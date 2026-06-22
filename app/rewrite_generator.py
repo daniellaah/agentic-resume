@@ -3,10 +3,13 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from openai import OpenAI
 from pydantic import BaseModel, Field, ValidationError
 
-from app.job_analysis import DEFAULT_OPENAI_MODEL, OPENAI_API_KEY_ENV, OPENAI_MODEL_ENV
+from app.llm_backend import (
+    LLMProviderOutputError,
+    MissingOpenAIAPIKeyError,
+    call_structured_llm,
+)
 from app.models import (
     EvidenceMatch,
     JobAnalysis,
@@ -36,6 +39,16 @@ Do not include commentary, scores, or final resume sections.
 ELIGIBLE_EVIDENCE_STATUSES = {"strong", "weak"}
 
 RewritePayload = Mapping[str, Any]
+
+__all__ = [
+    "MissingOpenAIAPIKeyError",
+    "RewriteOutputError",
+    "UnsafeRewriteError",
+    "build_rewrite_candidates",
+    "call_llm_for_rewrite_suggestions",
+    "generate_rewrite_suggestions",
+    "parse_rewrite_payload",
+]
 
 
 @dataclass(frozen=True)
@@ -72,10 +85,6 @@ class UnsafeRewriteError(RewriteGenerationError, ValueError):
     def __init__(self, issues: list[ValidationIssue]):
         self.issues = issues
         super().__init__(_format_critical_issues(issues))
-
-
-class MissingOpenAIAPIKeyError(RewriteGenerationError, RuntimeError):
-    """Raised when the OpenAI provider is used without an API key."""
 
 
 def generate_rewrite_suggestions(
@@ -249,42 +258,25 @@ def call_llm_for_rewrite_suggestions(
     candidates: list[RewriteCandidate],
     validation_feedback: list[ValidationIssue] | None = None,
 ) -> RewritePayload:
-    api_key = _get_openai_api_key()
-    client = OpenAI(api_key=api_key)
-
-    response = client.responses.parse(
-        model=_get_openai_model(),
-        input=[
-            {
-                "role": "system",
-                "content": REWRITE_SYSTEM_PROMPT,
-            },
-            {
-                "role": "user",
-                "content": json.dumps(
-                    {
-                        "candidates": [
-                            _candidate_to_payload(candidate) for candidate in candidates
-                        ],
-                        "validation_feedback": [
-                            _validation_issue_to_payload(issue)
-                            for issue in validation_feedback or []
-                        ],
-                    },
-                    indent=2,
-                ),
-            },
-        ],
-        text_format=RewriteSuggestionBatch,
-    )
-
-    batch = response.output_parsed
-    if batch is None:
-        raise RewriteOutputError(
-            "OpenAI response did not include parsed rewrite suggestions."
+    try:
+        return call_structured_llm(
+            system_prompt=REWRITE_SYSTEM_PROMPT,
+            user_content=json.dumps(
+                {
+                    "candidates": [
+                        _candidate_to_payload(candidate) for candidate in candidates
+                    ],
+                    "validation_feedback": [
+                        _validation_issue_to_payload(issue)
+                        for issue in validation_feedback or []
+                    ],
+                },
+                indent=2,
+            ),
+            response_model=RewriteSuggestionBatch,
         )
-
-    return batch.model_dump()
+    except LLMProviderOutputError as error:
+        raise RewriteOutputError(str(error)) from error
 
 
 def _candidate_to_payload(candidate: RewriteCandidate) -> dict[str, Any]:
@@ -307,21 +299,3 @@ def _validation_issue_to_payload(issue: ValidationIssue) -> dict[str, str]:
         "severity": issue.severity,
         "message": issue.message,
     }
-
-
-def _get_openai_api_key() -> str:
-    import os
-
-    api_key = os.environ.get(OPENAI_API_KEY_ENV)
-    if not api_key:
-        raise MissingOpenAIAPIKeyError(
-            f"{OPENAI_API_KEY_ENV} must be set to generate rewrite suggestions."
-        )
-
-    return api_key
-
-
-def _get_openai_model() -> str:
-    import os
-
-    return os.environ.get(OPENAI_MODEL_ENV, DEFAULT_OPENAI_MODEL)

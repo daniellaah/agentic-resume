@@ -1,5 +1,6 @@
 import pytest
 
+import app.llm_backend as llm_backend_module
 import app.rewrite_generator as rewrite_generator_module
 from app.models import (
     EvidenceMatch,
@@ -295,7 +296,8 @@ def test_generate_rewrite_suggestions_default_provider_rejects_missing_api_key(
             raise AssertionError("OpenAI client should not be created without a key.")
 
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.setattr(rewrite_generator_module, "OpenAI", FakeOpenAI)
+    monkeypatch.setenv("LLM_BACKEND", "openai")
+    monkeypatch.setattr(llm_backend_module, "OpenAI", FakeOpenAI)
 
     with pytest.raises(MissingOpenAIAPIKeyError, match="OPENAI_API_KEY"):
         generate_rewrite_suggestions(
@@ -328,7 +330,8 @@ def test_generate_rewrite_suggestions_uses_default_openai_provider(monkeypatch):
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-api-key")
     monkeypatch.setenv("OPENAI_MODEL_NAME", "test-model")
-    monkeypatch.setattr(rewrite_generator_module, "OpenAI", FakeOpenAI)
+    monkeypatch.delenv("LLM_BACKEND", raising=False)
+    monkeypatch.setattr(llm_backend_module, "OpenAI", FakeOpenAI)
 
     suggestions = generate_rewrite_suggestions(
         resume=make_resume(),

@@ -101,7 +101,7 @@ def test_save_agentic_tailoring_result_persists_run_trace_and_attempts():
         ).one()
 
         assert saved.workflow_version == AGENT_WORKFLOW_VERSION
-        assert saved.plan_id == "resume_tailoring_v18"
+        assert saved.plan_id == "resume_tailoring_v19"
         assert saved.orchestrator_agent == "resume_tailoring_orchestrator_agent"
         assert saved.run_metadata["workflow_version"] == AGENT_WORKFLOW_VERSION
         assert saved.final_result_json["status"] == "success"

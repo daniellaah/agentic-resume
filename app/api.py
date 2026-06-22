@@ -16,8 +16,9 @@ from app.job_analysis import (
     EmptyJobDescriptionError,
     JobAnalysisOutputError,
 )
-from app.job_analysis import (
-    MissingOpenAIAPIKeyError as MissingJobAnalysisOpenAIAPIKeyError,
+from app.llm_backend import (
+    LLMBackendConfigurationError,
+    LLMProviderRequestError,
 )
 from app.persistence import (
     DEFAULT_DATABASE_URL,
@@ -26,9 +27,6 @@ from app.persistence import (
     create_session_factory,
 )
 from app.resume_input import ResumeInputError
-from app.rewrite_generator import (
-    MissingOpenAIAPIKeyError as MissingRewriteOpenAIAPIKeyError,
-)
 from app.rewrite_generator import (
     RewriteOutputError,
 )
@@ -154,8 +152,8 @@ def tailor(
             request.job_description_text,
         )
     except (
-        MissingJobAnalysisOpenAIAPIKeyError,
-        MissingRewriteOpenAIAPIKeyError,
+        LLMBackendConfigurationError,
+        LLMProviderRequestError,
     ) as error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -186,8 +184,8 @@ def tailor_agentic(
             request.max_attempts,
         )
     except (
-        MissingJobAnalysisOpenAIAPIKeyError,
-        MissingRewriteOpenAIAPIKeyError,
+        LLMBackendConfigurationError,
+        LLMProviderRequestError,
     ) as error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

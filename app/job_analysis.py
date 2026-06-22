@@ -1,15 +1,14 @@
-import os
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from openai import OpenAI
 from pydantic import ValidationError
 
+from app.llm_backend import (
+    LLMProviderOutputError,
+    MissingOpenAIAPIKeyError,
+    call_structured_llm,
+)
 from app.models import JobAnalysis
-
-DEFAULT_OPENAI_MODEL = "gpt-5.5"
-OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
-OPENAI_MODEL_ENV = "OPENAI_MODEL_NAME"
 
 JOB_ANALYSIS_SYSTEM_PROMPT = """
 You analyze software engineering job descriptions.
@@ -23,6 +22,14 @@ Do not include resume rewrites, resume evidence, scores, or commentary.
 JobAnalysisPayload = Mapping[str, Any]
 JobAnalysisPayloadProvider = Callable[[str], JobAnalysisPayload]
 
+__all__ = [
+    "EmptyJobDescriptionError",
+    "JobAnalysisOutputError",
+    "MissingOpenAIAPIKeyError",
+    "analyze_job_description",
+    "parse_job_analysis_payload",
+]
+
 
 class JobAnalysisError(Exception):
     """Base error for job description analysis failures."""
@@ -34,10 +41,6 @@ class EmptyJobDescriptionError(JobAnalysisError, ValueError):
 
 class JobAnalysisOutputError(JobAnalysisError, ValueError):
     """Raised when provider output cannot be used as JobAnalysis."""
-
-
-class MissingOpenAIAPIKeyError(JobAnalysisError, RuntimeError):
-    """Raised when the OpenAI provider is used without an API key."""
 
 
 def analyze_job_description(
@@ -83,33 +86,11 @@ def _validate_requirement_ids(analysis: JobAnalysis) -> None:
 
 
 def _call_llm_for_job_analysis(jd_text: str) -> JobAnalysisPayload:
-    api_key = os.environ.get(OPENAI_API_KEY_ENV)
-    if not api_key:
-        raise MissingOpenAIAPIKeyError(
-            f"{OPENAI_API_KEY_ENV} must be set to analyze job descriptions."
+    try:
+        return call_structured_llm(
+            system_prompt=JOB_ANALYSIS_SYSTEM_PROMPT,
+            user_content=jd_text,
+            response_model=JobAnalysis,
         )
-
-    client = OpenAI(api_key=api_key)
-
-    response = client.responses.parse(
-        model=os.environ.get(OPENAI_MODEL_ENV, DEFAULT_OPENAI_MODEL),
-        input=[
-            {
-                "role": "system",
-                "content": JOB_ANALYSIS_SYSTEM_PROMPT,
-            },
-            {
-                "role": "user",
-                "content": jd_text,
-            },
-        ],
-        text_format=JobAnalysis,
-    )
-
-    analysis = response.output_parsed
-    if analysis is None:
-        raise JobAnalysisOutputError(
-            "OpenAI response did not include parsed JobAnalysis output."
-        )
-
-    return analysis.model_dump()
+    except LLMProviderOutputError as error:
+        raise JobAnalysisOutputError(str(error)) from error

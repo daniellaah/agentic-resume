@@ -1,6 +1,6 @@
 import pytest
 
-import app.job_analysis as job_analysis_module
+import app.llm_backend as llm_backend_module
 from app.job_analysis import (
     EmptyJobDescriptionError,
     JobAnalysisOutputError,
@@ -108,7 +108,8 @@ def test_analyze_job_description_uses_default_openai_provider(monkeypatch):
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-api-key")
     monkeypatch.setenv("OPENAI_MODEL_NAME", "test-model")
-    monkeypatch.setattr(job_analysis_module, "OpenAI", FakeOpenAI)
+    monkeypatch.delenv("LLM_BACKEND", raising=False)
+    monkeypatch.setattr(llm_backend_module, "OpenAI", FakeOpenAI)
 
     analysis = analyze_job_description("  Backend Engineer JD  ")
 
@@ -131,7 +132,8 @@ def test_analyze_job_description_default_provider_rejects_missing_api_key(
             raise AssertionError("OpenAI client should not be created without a key.")
 
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.setattr(job_analysis_module, "OpenAI", FakeOpenAI)
+    monkeypatch.setenv("LLM_BACKEND", "openai")
+    monkeypatch.setattr(llm_backend_module, "OpenAI", FakeOpenAI)
 
     with pytest.raises(MissingOpenAIAPIKeyError, match="OPENAI_API_KEY"):
         analyze_job_description("Backend Engineer JD")
@@ -155,7 +157,8 @@ def test_analyze_job_description_default_provider_uses_default_model(monkeypatch
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-api-key")
     monkeypatch.delenv("OPENAI_MODEL_NAME", raising=False)
-    monkeypatch.setattr(job_analysis_module, "OpenAI", FakeOpenAI)
+    monkeypatch.delenv("LLM_BACKEND", raising=False)
+    monkeypatch.setattr(llm_backend_module, "OpenAI", FakeOpenAI)
 
     analyze_job_description("Backend Engineer JD")
 

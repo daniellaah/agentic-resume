@@ -200,7 +200,7 @@ def test_get_agent_run_trace_returns_persisted_trace_after_completion(
     payload = response.json()
     assert payload["job"]["status"] == "succeeded"
     assert payload["job"]["run_id"] == job_id
-    assert payload["plan"]["plan_id"] == "resume_tailoring_v20"
+    assert payload["plan"]["plan_id"] == "resume_tailoring_v21"
     assert payload["final_result"]["status"] == "success"
     assert [step["agent_name"] for step in payload["steps"]] == [
         "resume_intake_agent",
@@ -219,4 +219,4 @@ def test_get_agent_run_trace_returns_persisted_trace_after_completion(
     assert payload["final_result"]["metadata"]["pipeline_version"] == "v6"
     assert payload["job"]["status"] == "succeeded"
     assert payload["final_result"]["metadata"]
-    assert AGENT_WORKFLOW_VERSION == "v20"
+    assert AGENT_WORKFLOW_VERSION == "v21"

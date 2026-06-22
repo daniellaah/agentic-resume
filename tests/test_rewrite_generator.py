@@ -288,6 +288,27 @@ def test_generate_rewrite_suggestions_raises_unsafe_rewrite_error_for_bad_eviden
         )
 
 
+def test_generate_rewrite_suggestions_rejects_claimed_requirement_not_in_text():
+    def fake_provider(candidates):
+        return {
+            "suggestions": [
+                {
+                    "bullet_id": "exp_1_bullet_1",
+                    "rewritten_text": "Built REST APIs for internal workflows.",
+                    "requirement_ids": ["req_1", "req_2"],
+                }
+            ]
+        }
+
+    with pytest.raises(UnsafeRewriteError, match="claims requirement req_1"):
+        generate_rewrite_suggestions(
+            resume=make_resume(),
+            job_analysis=make_job_analysis(),
+            evidence_matches=make_evidence_matches(),
+            payload_provider=fake_provider,
+        )
+
+
 def test_generate_rewrite_suggestions_default_provider_rejects_missing_api_key(
     monkeypatch,
 ):

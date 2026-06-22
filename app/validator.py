@@ -1,6 +1,8 @@
+from app.evidence_matcher import STRONG_SIGNALS, extract_evidence_signals
 from app.models import (
     EvidenceMatch,
     JobAnalysis,
+    JobRequirement,
     Resume,
     RewriteSuggestion,
     ValidationIssue,
@@ -19,9 +21,8 @@ def validate_resume_tailoring(
     for experience in resume.experience:
         valid_bullets.update(bullet.id for bullet in experience.bullets)
 
-    valid_requirements = set()
-    for requirement in job_analysis.requirements:
-        valid_requirements.add(requirement.id)
+    requirement_by_id = _requirement_by_id(job_analysis)
+    valid_requirements = set(requirement_by_id)
 
     evidence_status_map = {}
     for evidence_match in evidence_matches:
@@ -139,5 +140,40 @@ def validate_resume_tailoring(
                         ),
                     )
                 )
+            elif not _rewrite_covers_claimed_requirement(
+                rewrite_suggestion=rewrite_suggestion,
+                requirement=requirement_by_id[requirement_id],
+            ):
+                issues.append(
+                    ValidationIssue(
+                        issue_type="unsupported_claim",
+                        severity="critical",
+                        message=(
+                            f"Rewrite for bullet {rewrite_suggestion.bullet_id} "
+                            f"claims requirement {requirement_id}, but the rewritten "
+                            "text does not cover that requirement."
+                        ),
+                    )
+                )
 
     return issues
+
+
+def _requirement_by_id(job_analysis: JobAnalysis) -> dict[str, JobRequirement]:
+    return {requirement.id: requirement for requirement in job_analysis.requirements}
+
+
+def _rewrite_covers_claimed_requirement(
+    rewrite_suggestion: RewriteSuggestion,
+    requirement: JobRequirement,
+) -> bool:
+    requirement_signals = extract_evidence_signals(requirement.text)
+    if not requirement_signals:
+        return True
+
+    required_signals = requirement_signals & STRONG_SIGNALS
+    if not required_signals:
+        required_signals = requirement_signals
+
+    rewrite_signals = extract_evidence_signals(rewrite_suggestion.rewritten_text)
+    return bool(required_signals & rewrite_signals)

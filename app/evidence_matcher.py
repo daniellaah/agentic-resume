@@ -225,7 +225,7 @@ def _match_requirement(
             status="weak",
         )
 
-    if _extract_signals(requirement.text) & profile_signals:
+    if extract_evidence_signals(requirement.text) & profile_signals:
         return EvidenceMatch(
             requirement_id=requirement.id,
             bullet_ids=[],
@@ -244,8 +244,8 @@ def _score_bullet(
     bullet: ResumeBullet,
     order: int,
 ) -> BulletMatch | None:
-    requirement_signals = _extract_signals(requirement.text)
-    bullet_signals = _extract_signals(bullet.text)
+    requirement_signals = extract_evidence_signals(requirement.text)
+    bullet_signals = extract_evidence_signals(bullet.text)
     matching_signals = requirement_signals & bullet_signals
 
     if not matching_signals:
@@ -270,7 +270,7 @@ def _score_bullet(
     return None
 
 
-def _extract_signals(text: str) -> set[str]:
+def extract_evidence_signals(text: str) -> set[str]:
     normalized_text = _normalize_text(text)
     tokens = TOKEN_PATTERN.findall(normalized_text)
     token_signals = {
@@ -284,7 +284,7 @@ def _extract_signals(text: str) -> set[str]:
 
 def _profile_signals(resume: Resume) -> set[str]:
     profile_text = " ".join([resume.summary or "", *resume.skills])
-    return _extract_signals(profile_text)
+    return extract_evidence_signals(profile_text)
 
 
 def _normalize_text(text: str) -> str:

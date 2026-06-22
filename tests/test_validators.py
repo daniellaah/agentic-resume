@@ -374,3 +374,118 @@ def test_validator_allows_rewrite_targeting_uncertain_requirement():
     )
 
     assert issues == []
+
+
+def test_validator_detects_claimed_requirement_not_covered_by_rewrite_text():
+    job_analysis = JobAnalysis(
+        job_title="Machine Learning Engineer",
+        requirements=[
+            JobRequirement(
+                id="req_1",
+                text="Experience running online A/B testing for ML experiments.",
+                priority="must_have",
+            ),
+            JobRequirement(
+                id="req_2",
+                text="Build collaborative filtering pipelines with Hive.",
+                priority="must_have",
+            ),
+        ],
+    )
+
+    issues = validate_resume_tailoring(
+        resume=make_resume(),
+        job_analysis=job_analysis,
+        evidence_matches=[
+            EvidenceMatch(
+                requirement_id="req_1",
+                bullet_ids=["exp_1_bullet_1"],
+                status="strong",
+            ),
+            EvidenceMatch(
+                requirement_id="req_2",
+                bullet_ids=["exp_1_bullet_1"],
+                status="strong",
+            ),
+        ],
+        rewrite_suggestions=[
+            RewriteSuggestion(
+                bullet_id="exp_1_bullet_1",
+                rewritten_text=(
+                    "Built collaborative filtering pipelines using Hive over "
+                    "interaction logs."
+                ),
+                requirement_ids=["req_1", "req_2"],
+            )
+        ],
+    )
+
+    assert has_issue(
+        issues,
+        issue_type="unsupported_claim",
+        severity="critical",
+        message_fragment="claims requirement req_1",
+    )
+    assert not has_issue(
+        issues,
+        issue_type="unsupported_claim",
+        severity="critical",
+        message_fragment="claims requirement req_2",
+    )
+
+
+def test_validator_allows_rewrite_text_covering_all_claimed_requirements():
+    job_analysis = JobAnalysis(
+        job_title="Machine Learning Engineer",
+        requirements=[
+            JobRequirement(
+                id="req_1",
+                text="Experience with online A/B testing.",
+                priority="must_have",
+            ),
+            JobRequirement(
+                id="req_2",
+                text="Experience with offline evaluation and Recall@K.",
+                priority="must_have",
+            ),
+            JobRequirement(
+                id="req_3",
+                text="Experience building Hive data pipelines.",
+                priority="must_have",
+            ),
+        ],
+    )
+
+    issues = validate_resume_tailoring(
+        resume=make_resume(),
+        job_analysis=job_analysis,
+        evidence_matches=[
+            EvidenceMatch(
+                requirement_id="req_1",
+                bullet_ids=["exp_1_bullet_1"],
+                status="strong",
+            ),
+            EvidenceMatch(
+                requirement_id="req_2",
+                bullet_ids=["exp_1_bullet_1"],
+                status="strong",
+            ),
+            EvidenceMatch(
+                requirement_id="req_3",
+                bullet_ids=["exp_1_bullet_1"],
+                status="strong",
+            ),
+        ],
+        rewrite_suggestions=[
+            RewriteSuggestion(
+                bullet_id="exp_1_bullet_1",
+                rewritten_text=(
+                    "Built Hive data pipelines with offline evaluation, Recall@K "
+                    "analysis, and online A/B testing support."
+                ),
+                requirement_ids=["req_1", "req_2", "req_3"],
+            )
+        ],
+    )
+
+    assert issues == []

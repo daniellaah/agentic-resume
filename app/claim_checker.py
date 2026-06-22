@@ -4,6 +4,13 @@ from app.models import ValidationIssue
 
 TERM_PATTERN = re.compile(r"[a-z0-9+#.]+(?:[-/][a-z0-9+#.]+)*", re.IGNORECASE)
 NUMERIC_CLAIM_PATTERN = re.compile(r"\b\d+(?:\.\d+)?(?:%|x|k|m|ms|s)?\b")
+AB_TESTING_ACTION_PATTERN = re.compile(
+    r"\b("
+    r"built|conducted|developed|developing|executed|implemented|implementing|"
+    r"launched|owned|ran|run"
+    r")\b(?P<context>.{0,80}?)\b(?:a\s*/\s*b|a\s+b|ab)\s+testing\b",
+    re.IGNORECASE,
+)
 
 TECHNOLOGY_ALIASES = {
     "aws": "AWS",
@@ -89,6 +96,13 @@ def check_rewrite_claims(
             )
         )
 
+    if _introduces_ab_testing_action_claim(source_text, rewritten_text):
+        issues.append(
+            _unsupported_claim_issue(
+                "Unsupported A/B testing ownership claim introduced."
+            )
+        )
+
     return issues
 
 
@@ -121,6 +135,23 @@ def _extract_terms(text: str) -> set[str]:
                 terms.update(part for part in term.split(separator) if part)
 
     return terms
+
+
+def _introduces_ab_testing_action_claim(
+    source_text: str,
+    rewritten_text: str,
+) -> bool:
+    return _has_ab_testing_action_claim(
+        rewritten_text
+    ) and not _has_ab_testing_action_claim(source_text)
+
+
+def _has_ab_testing_action_claim(text: str) -> bool:
+    for match in AB_TESTING_ACTION_PATTERN.finditer(text):
+        matched_text = match.group(0).lower()
+        if "before" not in matched_text and "prior to" not in matched_text:
+            return True
+    return False
 
 
 def _unsupported_claim_issue(message: str) -> ValidationIssue:

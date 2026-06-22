@@ -53,3 +53,26 @@ def test_claim_checker_allows_technology_claim_already_in_source():
     )
 
     assert issues == []
+
+
+def test_claim_checker_rejects_new_ab_testing_ownership_claim():
+    issues = check_rewrite_claims(
+        source_text=(
+            "Developed offline evaluation with Recall@K before online A/B testing."
+        ),
+        rewritten_text=(
+            "Developed and implemented A/B testing for collaborative filtering."
+        ),
+    )
+
+    assert len(issues) == 1
+    assert "A/B testing ownership" in issues[0].message
+
+
+def test_claim_checker_allows_ab_testing_action_already_in_source():
+    issues = check_rewrite_claims(
+        source_text="Implemented A/B testing for ranking model experiments.",
+        rewritten_text="Implemented A/B testing for recommendation experiments.",
+    )
+
+    assert issues == []

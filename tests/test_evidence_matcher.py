@@ -160,3 +160,179 @@ def test_match_evidence_can_return_weak_match_for_partial_non_technical_overlap(
 
     assert matches[0].status == "weak"
     assert matches[0].bullet_ids == ["exp_1_bullet_1"]
+
+
+def make_recommender_resume() -> Resume:
+    return Resume(
+        summary=(
+            "Machine learning engineer with experience building large-scale "
+            "recommendation, retrieval, candidate generation, offline evaluation, "
+            "A/B testing, and production ML pipelines."
+        ),
+        skills=["Python", "PyTorch", "Spark", "Hive"],
+        experience=[
+            ResumeExperience(
+                id="exp_1",
+                company="RedNote",
+                title="Machine Learning Engineer",
+                start_date="2021-01",
+                bullets=[
+                    ResumeBullet(
+                        id="exp_1_bullet_1",
+                        text=(
+                            "Designed and shipped production recommendation models "
+                            "for large-scale candidate generation and retrieval."
+                        ),
+                    ),
+                    ResumeBullet(
+                        id="exp_1_bullet_2",
+                        text=(
+                            "Launched a multi-interest retrieval model with "
+                            "self-attention over behavior sequences to learn diverse "
+                            "user interest embeddings."
+                        ),
+                    ),
+                    ResumeBullet(
+                        id="exp_1_bullet_3",
+                        text=(
+                            "Improved a two-tower retrieval model by applying "
+                            "LogQ-corrected in-batch sampled softmax and a "
+                            "self-supervised contrastive auxiliary objective."
+                        ),
+                    ),
+                ],
+            ),
+            ResumeExperience(
+                id="exp_2",
+                company="Joyy",
+                title="Machine Learning Engineer",
+                start_date="2019-01",
+                bullets=[
+                    ResumeBullet(
+                        id="exp_2_bullet_1",
+                        text=(
+                            "Owned candidate generation for personalized video "
+                            "recommendations, building production retrieval models, "
+                            "offline evaluation workflows, and feature pipelines "
+                            "through ANN-indexed real-time serving."
+                        ),
+                    ),
+                    ResumeBullet(
+                        id="exp_2_bullet_2",
+                        text=(
+                            "Built and deployed a two-tower model to learn user and "
+                            "item embeddings for candidate generation, serving via "
+                            "an ANN index for real-time retrieval."
+                        ),
+                    ),
+                    ResumeBullet(
+                        id="exp_2_bullet_3",
+                        text=(
+                            "Built user- and item-based collaborative filtering "
+                            "pipelines using Hive and developed offline evaluation "
+                            "with Recall@K before online A/B testing."
+                        ),
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
+def make_recommender_job_analysis() -> JobAnalysis:
+    return JobAnalysis(
+        job_title="Machine Learning Engineer",
+        requirements=[
+            JobRequirement(
+                id="req_1",
+                text="Experience with candidate generation.",
+                priority="must_have",
+            ),
+            JobRequirement(
+                id="req_2",
+                text="Two-tower models.",
+                priority="must_have",
+            ),
+            JobRequirement(
+                id="req_3",
+                text="Embedding-based retrieval.",
+                priority="must_have",
+            ),
+            JobRequirement(
+                id="req_4",
+                text="ANN serving.",
+                priority="nice_to_have",
+            ),
+            JobRequirement(
+                id="req_5",
+                text="A/B testing.",
+                priority="nice_to_have",
+            ),
+            JobRequirement(
+                id="req_6",
+                text="Offline evaluation.",
+                priority="must_have",
+            ),
+            JobRequirement(
+                id="req_7",
+                text="Python.",
+                priority="must_have",
+            ),
+            JobRequirement(
+                id="req_8",
+                text="PyTorch.",
+                priority="nice_to_have",
+            ),
+            JobRequirement(
+                id="req_9",
+                text="Spark.",
+                priority="nice_to_have",
+            ),
+            JobRequirement(
+                id="req_10",
+                text="Hive.",
+                priority="nice_to_have",
+            ),
+            JobRequirement(
+                id="req_11",
+                text="Production ML pipelines.",
+                priority="must_have",
+            ),
+        ],
+    )
+
+
+def test_match_evidence_matches_recommender_system_requirements():
+    matches = match_evidence(make_recommender_resume(), make_recommender_job_analysis())
+    match_by_requirement = {match.requirement_id: match for match in matches}
+
+    assert match_by_requirement["req_1"].status == "strong"
+    assert "exp_1_bullet_1" in match_by_requirement["req_1"].bullet_ids
+    assert "exp_2_bullet_1" in match_by_requirement["req_1"].bullet_ids
+    assert match_by_requirement["req_2"].status == "strong"
+    assert "exp_1_bullet_3" in match_by_requirement["req_2"].bullet_ids
+    assert "exp_2_bullet_2" in match_by_requirement["req_2"].bullet_ids
+    assert match_by_requirement["req_3"].status == "strong"
+    assert "exp_1_bullet_2" in match_by_requirement["req_3"].bullet_ids
+    assert match_by_requirement["req_4"].status == "strong"
+    assert "exp_2_bullet_1" in match_by_requirement["req_4"].bullet_ids
+    assert match_by_requirement["req_5"].status == "strong"
+    assert match_by_requirement["req_5"].bullet_ids == ["exp_2_bullet_3"]
+    assert match_by_requirement["req_6"].status == "strong"
+    assert "exp_2_bullet_3" in match_by_requirement["req_6"].bullet_ids
+    assert match_by_requirement["req_10"].status == "strong"
+    assert match_by_requirement["req_10"].bullet_ids == ["exp_2_bullet_3"]
+    assert match_by_requirement["req_11"].status in {"strong", "weak"}
+    assert match_by_requirement["req_11"].bullet_ids
+
+
+def test_match_evidence_uses_profile_skills_as_uncertain_non_rewritable_evidence():
+    matches = match_evidence(make_recommender_resume(), make_recommender_job_analysis())
+    match_by_requirement = {match.requirement_id: match for match in matches}
+
+    assert match_by_requirement["req_7"].status == "uncertain"
+    assert match_by_requirement["req_7"].bullet_ids == []
+    assert match_by_requirement["req_8"].status == "uncertain"
+    assert match_by_requirement["req_8"].bullet_ids == []
+    assert match_by_requirement["req_9"].status == "uncertain"
+    assert match_by_requirement["req_9"].bullet_ids == []

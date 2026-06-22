@@ -66,6 +66,30 @@ class AgentRunRecord(Base):
         cascade="all, delete-orphan",
         order_by="AgentAttemptRecord.attempt_number",
     )
+    jobs: Mapped[list[AgentRunJobRecord]] = relationship(back_populates="run")
+
+
+class AgentRunJobRecord(Base):
+    __tablename__ = "agent_run_jobs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    rq_job_id: Mapped[str | None] = mapped_column(String(128))
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    run_id: Mapped[str | None] = mapped_column(ForeignKey("agent_runs.id"))
+    error_message: Mapped[str | None] = mapped_column(Text)
+    request_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    run: Mapped[AgentRunRecord | None] = relationship(back_populates="jobs")
 
 
 class AgentStepRecord(Base):
@@ -138,6 +162,71 @@ def create_session(engine: Engine) -> Generator[Session]:
 
 def init_database(engine: Engine) -> None:
     Base.metadata.create_all(engine)
+
+
+def create_agent_run_job_record(
+    session: Session,
+    *,
+    job_id: str,
+    request_payload: BaseModel,
+    rq_job_id: str | None = None,
+) -> AgentRunJobRecord:
+    job = AgentRunJobRecord(
+        id=job_id,
+        rq_job_id=rq_job_id,
+        status="queued",
+        request_json=_model_dump_json(request_payload),
+    )
+    session.add(job)
+    session.flush()
+    return job
+
+
+def mark_agent_run_job_running(
+    session: Session,
+    job_id: str,
+) -> AgentRunJobRecord:
+    job = session.get(AgentRunJobRecord, job_id)
+    if job is None:
+        raise ValueError(f"Agent run job not found: {job_id}")
+
+    job.status = "running"
+    job.updated_at = datetime.now(UTC)
+    session.flush()
+    return job
+
+
+def mark_agent_run_job_succeeded(
+    session: Session,
+    job_id: str,
+    run_id: str,
+) -> AgentRunJobRecord:
+    job = session.get(AgentRunJobRecord, job_id)
+    if job is None:
+        raise ValueError(f"Agent run job not found: {job_id}")
+
+    job.status = "succeeded"
+    job.run_id = run_id
+    job.error_message = None
+    job.updated_at = datetime.now(UTC)
+    session.flush()
+    return job
+
+
+def mark_agent_run_job_failed(
+    session: Session,
+    job_id: str,
+    error_message: str,
+) -> AgentRunJobRecord:
+    job = session.get(AgentRunJobRecord, job_id)
+    if job is None:
+        raise ValueError(f"Agent run job not found: {job_id}")
+
+    job.status = "failed"
+    job.error_message = error_message
+    job.updated_at = datetime.now(UTC)
+    session.flush()
+    return job
 
 
 def save_agentic_tailoring_result(

@@ -76,7 +76,7 @@ def fake_agent_rewrite_provider(candidates, feedback):
     }
 
 
-def test_v16_flow_returns_agentic_plan_and_tool_trace_without_network_access():
+def test_v17_flow_returns_agentic_plan_and_tool_trace_without_network_access():
     resume_text = (ROOT_DIR / "data" / "sample_resume.txt").read_text()
     jd_text = (ROOT_DIR / "data" / "sample_jd.txt").read_text()
 
@@ -90,7 +90,7 @@ def test_v16_flow_returns_agentic_plan_and_tool_trace_without_network_access():
     assert result.status == "success"
     assert result.metadata.workflow_version == AGENT_WORKFLOW_VERSION
     assert result.plan is not None
-    assert result.plan.plan_id == "resume_tailoring_v16"
+    assert result.plan.plan_id == "resume_tailoring_v17"
     assert result.plan.orchestrator_agent == "resume_tailoring_orchestrator_agent"
     assert result.final_result.status == "success"
     assert result.final_result.validation_issues == []

@@ -39,7 +39,7 @@ Run a sample tailoring request:
 bash examples/curl_tailor.sh
 ```
 
-## Run the Trace Viewer
+## Run the Frontend
 
 ```bash
 cd frontend

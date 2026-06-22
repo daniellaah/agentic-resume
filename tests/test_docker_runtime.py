@@ -43,6 +43,23 @@ def test_frontend_package_defines_trace_viewer_runtime_scripts():
     assert '"lucide-react":' in package_json
 
 
+def test_frontend_defines_agent_run_intake_flow():
+    page = (ROOT_DIR / "frontend" / "app" / "page.tsx").read_text()
+    route_handler = (
+        ROOT_DIR / "frontend" / "app" / "agent-runs" / "route.ts"
+    ).read_text()
+    api_client = (ROOT_DIR / "frontend" / "lib" / "api.ts").read_text()
+
+    assert 'action="/agent-runs"' in page
+    assert 'name="resumeText"' in page
+    assert 'name="jobDescriptionText"' in page
+    assert 'name="maxAttempts"' in page
+    assert "createAgentRun" in route_handler
+    assert 'url.searchParams.set("jobId", result.job.job_id)' in route_handler
+    assert "POST" in api_client
+    assert "`${API_URL}/agent-runs`" in api_client
+
+
 def test_frontend_dockerfile_builds_standalone_next_app():
     dockerfile = (ROOT_DIR / "frontend" / "Dockerfile").read_text()
 

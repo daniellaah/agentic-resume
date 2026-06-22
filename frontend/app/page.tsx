@@ -7,6 +7,7 @@ import {
   GitBranch,
   RefreshCw,
   Search,
+  Send,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -27,6 +28,7 @@ type PageProps = {
 export default async function Page({ searchParams }: PageProps) {
   const params = (await searchParams) ?? {};
   const jobId = valueFromSearchParam(params.jobId);
+  const runError = valueFromSearchParam(params.runError);
   const traceResult = jobId ? await loadAgentRunTrace(jobId) : null;
 
   return (
@@ -37,6 +39,8 @@ export default async function Page({ searchParams }: PageProps) {
             <p className="eyebrow">Agentic Resume</p>
             <h1>Agent Run Trace</h1>
           </div>
+
+          <CreateRunForm errorMessage={runError} />
 
           <form className="lookupForm" action="/" method="get">
             <label htmlFor="jobId">Job ID</label>
@@ -86,6 +90,48 @@ function valueFromSearchParam(value: string | string[] | undefined): string {
     return value[0] ?? "";
   }
   return value ?? "";
+}
+
+function CreateRunForm({ errorMessage }: { errorMessage: string }) {
+  return (
+    <form className="createForm" action="/agent-runs" method="post">
+      <div className="formTitleRow">
+        <FileText aria-hidden="true" size={18} />
+        <h2>Create Run</h2>
+      </div>
+
+      {errorMessage ? (
+        <p className="feedbackBanner" role="alert">
+          {errorMessage}
+        </p>
+      ) : null}
+
+      <label htmlFor="resumeText">Resume Text</label>
+      <textarea id="resumeText" name="resumeText" rows={7} required />
+
+      <label htmlFor="jobDescriptionText">Job Description</label>
+      <textarea
+        id="jobDescriptionText"
+        name="jobDescriptionText"
+        rows={7}
+        required
+      />
+
+      <div className="compactField">
+        <label htmlFor="maxAttempts">Max Attempts</label>
+        <select id="maxAttempts" name="maxAttempts" defaultValue="2">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+        </select>
+      </div>
+
+      <button className="primaryButton" type="submit">
+        <Send aria-hidden="true" size={16} />
+        <span>Create Run</span>
+      </button>
+    </form>
+  );
 }
 
 function RuntimeSummary() {

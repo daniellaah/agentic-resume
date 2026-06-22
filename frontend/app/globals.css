@@ -35,7 +35,9 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
   letter-spacing: 0;
 }
@@ -100,15 +102,88 @@ h2 {
   font-size: 1rem;
 }
 
-.lookupForm {
+.lookupForm,
+.createForm {
   display: grid;
   gap: 8px;
 }
 
-.lookupForm label {
+.lookupForm label,
+.createForm label {
   color: var(--muted);
   font-size: 0.85rem;
   font-weight: 700;
+}
+
+.createForm {
+  gap: 10px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.formTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+}
+
+.formTitleRow h2 {
+  color: var(--text);
+}
+
+.createForm textarea,
+.createForm select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--surface);
+}
+
+.createForm textarea {
+  min-height: 132px;
+  resize: vertical;
+  padding: 10px 12px;
+  line-height: 1.4;
+}
+
+.createForm select {
+  height: 40px;
+  padding: 0 10px;
+}
+
+.compactField {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  align-items: center;
+  gap: 10px;
+}
+
+.primaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.feedbackBanner {
+  margin: 0;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 0.86rem;
+  line-height: 1.35;
 }
 
 .lookupRow {

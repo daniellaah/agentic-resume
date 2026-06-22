@@ -85,3 +85,9 @@ export type AgentRunTrace = {
   attempts: TailoringAttempt[];
   final_result: FinalResult | null;
 };
+
+export type CreateAgentRunInput = {
+  resumeText: string;
+  jobDescriptionText: string;
+  maxAttempts: number;
+};

@@ -183,9 +183,11 @@ def test_evidence_match_rejects_invalid_status():
 
 
 def test_rewrite_suggestion_accepts_valid_data():
+    rewritten_text = "Built Python and FastAPI APIs aligned with backend product needs."
+
     suggestion = RewriteSuggestion(
         bullet_id="exp_1_bullet_1",
-        rewritten_text="Built Python and FastAPI APIs aligned with backend product needs.",
+        rewritten_text=rewritten_text,
         requirement_ids=["req_1"],
     )
 
@@ -194,10 +196,12 @@ def test_rewrite_suggestion_accepts_valid_data():
 
 
 def test_rewrite_suggestion_rejects_empty_bullet_id():
+    rewritten_text = "Built Python and FastAPI APIs aligned with backend product needs."
+
     with pytest.raises(ValidationError):
         RewriteSuggestion(
             bullet_id="",
-            rewritten_text="Built Python and FastAPI APIs aligned with backend product needs.",
+            rewritten_text=rewritten_text,
             requirement_ids=["req_1"],
         )
 
@@ -212,19 +216,23 @@ def test_rewrite_suggestion_rejects_empty_rewritten_text():
 
 
 def test_rewrite_suggestion_rejects_empty_requirement_ids():
+    rewritten_text = "Built Python and FastAPI APIs aligned with backend product needs."
+
     with pytest.raises(ValidationError):
         RewriteSuggestion(
             bullet_id="exp_1_bullet_1",
-            rewritten_text="Built Python and FastAPI APIs aligned with backend product needs.",
+            rewritten_text=rewritten_text,
             requirement_ids=[],
         )
 
 
 def test_rewrite_suggestion_rejects_empty_requirement_id_item():
+    rewritten_text = "Built Python and FastAPI APIs aligned with backend product needs."
+
     with pytest.raises(ValidationError):
         RewriteSuggestion(
             bullet_id="exp_1_bullet_1",
-            rewritten_text="Built Python and FastAPI APIs aligned with backend product needs.",
+            rewritten_text=rewritten_text,
             requirement_ids=[""],
         )
 

@@ -76,7 +76,9 @@ def test_validator_returns_no_issues_for_valid_tailoring():
         rewrite_suggestions=[
             RewriteSuggestion(
                 bullet_id="exp_1_bullet_1",
-                rewritten_text="Built Python and FastAPI backend APIs for internal users.",
+                rewritten_text=(
+                    "Built Python and FastAPI backend APIs for internal users."
+                ),
                 requirement_ids=["req_1"],
             )
         ],

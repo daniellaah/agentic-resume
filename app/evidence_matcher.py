@@ -3,7 +3,6 @@ from dataclasses import dataclass
 
 from app.models import EvidenceMatch, JobAnalysis, JobRequirement, Resume, ResumeBullet
 
-
 TOKEN_PATTERN = re.compile(r"[a-z0-9+#]+(?:/[a-z0-9+#]+)?")
 
 SIGNAL_ALIASES = {
@@ -71,11 +70,7 @@ def match_evidence(resume: Resume, job_analysis: JobAnalysis) -> list[EvidenceMa
 
 
 def _flatten_bullets(resume: Resume) -> list[ResumeBullet]:
-    return [
-        bullet
-        for experience in resume.experience
-        for bullet in experience.bullets
-    ]
+    return [bullet for experience in resume.experience for bullet in experience.bullets]
 
 
 def _match_requirement(
@@ -142,9 +137,7 @@ def _score_bullet(
 def _extract_signals(text: str) -> set[str]:
     tokens = TOKEN_PATTERN.findall(text.lower())
     return {
-        signal
-        for token in tokens
-        if (signal := SIGNAL_ALIASES.get(token)) is not None
+        signal for token in tokens if (signal := SIGNAL_ALIASES.get(token)) is not None
     }
 
 

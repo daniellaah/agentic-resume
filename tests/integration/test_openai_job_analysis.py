@@ -5,7 +5,6 @@ import pytest
 
 from app.job_analysis import analyze_job_description
 
-
 ROOT_DIR = Path(__file__).resolve().parents[2]
 
 
@@ -13,9 +12,8 @@ pytestmark = pytest.mark.integration
 
 
 def should_run_openai_integration() -> bool:
-    return (
-        os.environ.get("RUN_OPENAI_INTEGRATION") == "1"
-        and bool(os.environ.get("OPENAI_API_KEY"))
+    return os.environ.get("RUN_OPENAI_INTEGRATION") == "1" and bool(
+        os.environ.get("OPENAI_API_KEY")
     )
 
 

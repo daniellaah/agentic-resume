@@ -1,6 +1,6 @@
+import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-import json
 from typing import Any
 
 from openai import OpenAI
@@ -17,7 +17,6 @@ from app.models import (
     ValidationIssue,
 )
 from app.validator import validate_resume_tailoring
-
 
 REWRITE_SYSTEM_PROMPT = """
 You generate evidence-grounded resume rewrite suggestions.
@@ -123,8 +122,13 @@ def build_rewrite_candidates(
             if bullet_id not in bullets:
                 continue
             requirement_ids_by_bullet_id.setdefault(bullet_id, [])
-            if evidence_match.requirement_id not in requirement_ids_by_bullet_id[bullet_id]:
-                requirement_ids_by_bullet_id[bullet_id].append(evidence_match.requirement_id)
+            if (
+                evidence_match.requirement_id
+                not in requirement_ids_by_bullet_id[bullet_id]
+            ):
+                requirement_ids_by_bullet_id[bullet_id].append(
+                    evidence_match.requirement_id
+                )
 
     candidates: list[RewriteCandidate] = []
     for bullet_id, bullet in bullets.items():
@@ -172,10 +176,7 @@ def _bullet_by_id(resume: Resume) -> dict[str, ResumeBullet]:
 
 
 def _requirement_by_id(job_analysis: JobAnalysis) -> dict[str, JobRequirement]:
-    return {
-        requirement.id: requirement
-        for requirement in job_analysis.requirements
-    }
+    return {requirement.id: requirement for requirement in job_analysis.requirements}
 
 
 def _validate_suggestions_against_candidates(
@@ -200,7 +201,9 @@ def _validate_suggestions_against_candidates(
         )
 
     for suggestion in suggestions:
-        allowed_requirement_ids = allowed_requirement_ids_by_bullet_id[suggestion.bullet_id]
+        allowed_requirement_ids = allowed_requirement_ids_by_bullet_id[
+            suggestion.bullet_id
+        ]
         unexpected_requirement_ids = [
             requirement_id
             for requirement_id in suggestion.requirement_ids
@@ -209,7 +212,8 @@ def _validate_suggestions_against_candidates(
 
         if unexpected_requirement_ids:
             raise RewriteOutputError(
-                "Rewrite suggestion targets requirements outside its evidence candidate."
+                "Rewrite suggestion targets requirements outside its evidence "
+                "candidate."
             )
 
 
@@ -253,8 +257,7 @@ def _call_llm_for_rewrite_suggestions(
                 "content": json.dumps(
                     {
                         "candidates": [
-                            _candidate_to_payload(candidate)
-                            for candidate in candidates
+                            _candidate_to_payload(candidate) for candidate in candidates
                         ]
                     },
                     indent=2,

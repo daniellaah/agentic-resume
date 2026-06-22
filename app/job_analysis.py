@@ -1,12 +1,11 @@
-from collections.abc import Callable, Mapping
 import os
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from openai import OpenAI
 from pydantic import ValidationError
 
 from app.models import JobAnalysis
-
 
 DEFAULT_OPENAI_MODEL = "gpt-5.5"
 OPENAI_API_KEY_ENV = "OPENAI_API_KEY"

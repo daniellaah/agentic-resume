@@ -9,7 +9,6 @@ from app.parsers import parse_sample_resume
 from app.rewrite_generator import generate_rewrite_suggestions
 from app.validator import validate_resume_tailoring
 
-
 ROOT_DIR = Path(__file__).resolve().parents[2]
 
 
@@ -17,9 +16,8 @@ pytestmark = pytest.mark.integration
 
 
 def should_run_openai_integration() -> bool:
-    return (
-        os.environ.get("RUN_OPENAI_INTEGRATION") == "1"
-        and bool(os.environ.get("OPENAI_API_KEY"))
+    return os.environ.get("RUN_OPENAI_INTEGRATION") == "1" and bool(
+        os.environ.get("OPENAI_API_KEY")
     )
 
 
@@ -85,7 +83,4 @@ def test_openai_rewrite_generator_returns_validator_safe_suggestions():
 
     assert suggestions
     assert issues == []
-    assert all(
-        "req_5" not in suggestion.requirement_ids
-        for suggestion in suggestions
-    )
+    assert all("req_5" not in suggestion.requirement_ids for suggestion in suggestions)

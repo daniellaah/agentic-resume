@@ -2,7 +2,6 @@ import re
 
 from app.models import Resume, ResumeBullet, ResumeExperience
 
-
 BULLET_PATTERN = re.compile(r"^- \[(?P<id>[^\]]+)\] (?P<text>.+)$")
 
 

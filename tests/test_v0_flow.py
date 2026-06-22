@@ -9,14 +9,12 @@ from app.models import (
 from app.parsers import parse_sample_resume
 from app.validator import validate_resume_tailoring
 
-
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
 
 def make_sample_resume():
     resume_text = (ROOT_DIR / "data" / "sample_resume.txt").read_text()
     return parse_sample_resume(resume_text)
-
 
 
 def make_sample_job_analysis() -> JobAnalysis:
@@ -77,8 +75,7 @@ def make_supported_rewrite_suggestions() -> list[RewriteSuggestion]:
         RewriteSuggestion(
             bullet_id="exp_1_bullet_1",
             rewritten_text=(
-                "Built Python and FastAPI REST APIs for internal analyst "
-                "workflows."
+                "Built Python and FastAPI REST APIs for internal analyst workflows."
             ),
             requirement_ids=["req_1"],
         ),

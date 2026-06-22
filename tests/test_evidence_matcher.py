@@ -1,5 +1,11 @@
 from app.evidence_matcher import match_evidence
-from app.models import JobAnalysis, JobRequirement, Resume, ResumeBullet, ResumeExperience
+from app.models import (
+    JobAnalysis,
+    JobRequirement,
+    Resume,
+    ResumeBullet,
+    ResumeExperience,
+)
 
 
 def make_resume() -> Resume:

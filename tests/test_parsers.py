@@ -4,7 +4,6 @@ import pytest
 
 from app.parsers import parse_sample_resume
 
-
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
 

@@ -6,7 +6,6 @@ from app.models import RewriteSuggestion
 from app.parsers import parse_sample_resume
 from app.validator import validate_resume_tailoring
 
-
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
 
@@ -69,8 +68,7 @@ def test_v2_flow_accepts_supported_rewrite_suggestions_with_matched_evidence():
             RewriteSuggestion(
                 bullet_id="exp_1_bullet_1",
                 rewritten_text=(
-                    "Built Python and FastAPI REST APIs for internal analyst "
-                    "workflows."
+                    "Built Python and FastAPI REST APIs for internal analyst workflows."
                 ),
                 requirement_ids=["req_1", "req_2"],
             ),

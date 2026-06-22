@@ -66,7 +66,7 @@ def tailor_resume_to_job(
     except UnsafeRewriteError as error:
         return TailoringResult(
             resume=resume,
-            metadata=_build_metadata(),
+            metadata=build_tailoring_metadata(),
             job_analysis=job_analysis,
             evidence_matches=evidence_matches,
             rewrite_suggestions=[],
@@ -83,7 +83,7 @@ def tailor_resume_to_job(
 
     return TailoringResult(
         resume=resume,
-        metadata=_build_metadata(),
+        metadata=build_tailoring_metadata(),
         job_analysis=job_analysis,
         evidence_matches=evidence_matches,
         rewrite_suggestions=rewrite_suggestions,
@@ -102,7 +102,7 @@ def _status_for_validation_issues(
     return "success"
 
 
-def _build_metadata() -> TailoringMetadata:
+def build_tailoring_metadata() -> TailoringMetadata:
     return TailoringMetadata(
         pipeline_version=PIPELINE_VERSION,
         resume_input_format=DEFAULT_RESUME_INPUT_FORMAT,

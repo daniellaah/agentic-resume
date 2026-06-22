@@ -28,6 +28,8 @@ technologies not present in the source bullet.
 Return exactly one RewriteSuggestion for each candidate.
 Each suggestion must use the candidate bullet_id and only that candidate's
 requirement_ids.
+If validation_feedback is present, repair the previous failed attempt by
+addressing those issues.
 Do not include commentary, scores, or final resume sections.
 """.strip()
 
@@ -90,7 +92,7 @@ def generate_rewrite_suggestions(
     if not candidates:
         return []
 
-    provider = payload_provider or _call_llm_for_rewrite_suggestions
+    provider = payload_provider or call_llm_for_rewrite_suggestions
     payload = provider(candidates)
     suggestions = parse_rewrite_payload(payload)
     _validate_suggestions_against_candidates(
@@ -243,8 +245,9 @@ def _format_critical_issues(issues: list[ValidationIssue]) -> str:
     return "; ".join(issue.message for issue in issues)
 
 
-def _call_llm_for_rewrite_suggestions(
+def call_llm_for_rewrite_suggestions(
     candidates: list[RewriteCandidate],
+    validation_feedback: list[ValidationIssue] | None = None,
 ) -> RewritePayload:
     api_key = _get_openai_api_key()
     client = OpenAI(api_key=api_key)
@@ -262,7 +265,11 @@ def _call_llm_for_rewrite_suggestions(
                     {
                         "candidates": [
                             _candidate_to_payload(candidate) for candidate in candidates
-                        ]
+                        ],
+                        "validation_feedback": [
+                            _validation_issue_to_payload(issue)
+                            for issue in validation_feedback or []
+                        ],
                     },
                     indent=2,
                 ),
@@ -291,6 +298,14 @@ def _candidate_to_payload(candidate: RewriteCandidate) -> dict[str, Any]:
             }
             for requirement in candidate.requirements
         ],
+    }
+
+
+def _validation_issue_to_payload(issue: ValidationIssue) -> dict[str, str]:
+    return {
+        "issue_type": issue.issue_type,
+        "severity": issue.severity,
+        "message": issue.message,
     }
 
 

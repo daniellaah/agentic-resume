@@ -4,10 +4,10 @@
 
 V19 adds an LLM provider abstraction and a local Ollama backend.
 
-The backend can now run the same agentic resume workflow with either OpenAI or a
-local Ollama model. OpenAI remains the default backend. Ollama is intended for
-local development, cost control, and experimentation with weaker model outputs
-that exercise the validator and critic loop.
+The backend can now run the same agentic resume workflow with either a local
+Ollama model or OpenAI. Ollama is the default backend for local-first
+development, cost control, and experimentation with weaker model outputs that
+exercise the validator and critic loop.
 
 ## Technology Plan
 
@@ -24,21 +24,21 @@ The frontend does not change in V19.
 
 ## Public Configuration
 
-Default production-style configuration:
-
-```text
-LLM_BACKEND=openai
-OPENAI_API_KEY=
-OPENAI_MODEL_NAME=gpt-5.5
-```
-
-Local Ollama configuration:
+Default local configuration:
 
 ```text
 LLM_BACKEND=ollama
 OLLAMA_BASE_URL=http://host.docker.internal:11434
 OLLAMA_MODEL=llama3.2:latest
 OLLAMA_TIMEOUT_SECONDS=120
+```
+
+OpenAI configuration:
+
+```text
+LLM_BACKEND=openai
+OPENAI_API_KEY=
+OPENAI_MODEL_NAME=gpt-5.5
 ```
 
 When running without Docker, `OLLAMA_BASE_URL` can be:
@@ -117,7 +117,7 @@ resume_tailoring_v19
 - model selection in the UI
 - provider-specific prompt tuning beyond JSON schema guidance
 - streaming tokens from Ollama
-- replacing OpenAI as the default backend
+- replacing Ollama as the default local backend
 - changing agent orchestration behavior
 
 ## Testing Strategy
@@ -147,8 +147,8 @@ one deterministic requirement.
 
 ## Definition of Done
 
-- OpenAI remains the default backend
-- Ollama can be selected with `LLM_BACKEND=ollama`
+- Ollama is the default backend
+- OpenAI can be selected with `LLM_BACKEND=openai`
 - API and worker receive provider configuration
 - local Docker Compose can reach host Ollama through `host.docker.internal`
 - existing agentic workflow tests pass

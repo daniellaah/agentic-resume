@@ -5,7 +5,7 @@ services:
     environment:
       AGENT_JOB_QUEUE_NAME: agentic-tailoring
       DATABASE_URL: postgresql+psycopg://agentic_resume:agentic_resume@postgres:5432/agentic_resume
-      LLM_BACKEND: ${LLM_BACKEND:-openai}
+      LLM_BACKEND: ${LLM_BACKEND:-ollama}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:latest}
       OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-120}
@@ -40,7 +40,7 @@ services:
     environment:
       AGENT_JOB_QUEUE_NAME: agentic-tailoring
       DATABASE_URL: postgresql+psycopg://agentic_resume:agentic_resume@postgres:5432/agentic_resume
-      LLM_BACKEND: ${LLM_BACKEND:-openai}
+      LLM_BACKEND: ${LLM_BACKEND:-ollama}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:latest}
       OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-120}

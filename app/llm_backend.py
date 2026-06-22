@@ -8,7 +8,7 @@ from typing import Any, Literal
 from openai import OpenAI
 from pydantic import BaseModel
 
-DEFAULT_LLM_BACKEND = "openai"
+DEFAULT_LLM_BACKEND = "ollama"
 DEFAULT_OPENAI_MODEL = "gpt-5.5"
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
 DEFAULT_OLLAMA_MODEL = "llama3.2:latest"

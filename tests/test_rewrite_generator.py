@@ -330,7 +330,7 @@ def test_generate_rewrite_suggestions_uses_default_openai_provider(monkeypatch):
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-api-key")
     monkeypatch.setenv("OPENAI_MODEL_NAME", "test-model")
-    monkeypatch.delenv("LLM_BACKEND", raising=False)
+    monkeypatch.setenv("LLM_BACKEND", "openai")
     monkeypatch.setattr(llm_backend_module, "OpenAI", FakeOpenAI)
 
     suggestions = generate_rewrite_suggestions(

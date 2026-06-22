@@ -27,7 +27,7 @@ def test_docker_compose_defines_api_worker_redis_and_postgres_services():
     assert "python -m app.worker" in compose
     assert "alembic upgrade head" in compose
     assert "AGENTIC_RESUME_API_URL: http://api:8000" in compose
-    assert "LLM_BACKEND: ${LLM_BACKEND:-openai}" in compose
+    assert "LLM_BACKEND: ${LLM_BACKEND:-ollama}" in compose
     assert "OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}" in (
         compose
     )
@@ -97,7 +97,7 @@ def test_frontend_dockerfile_builds_standalone_next_app():
 def test_env_example_includes_runtime_connection_settings():
     env_example = (ROOT_DIR / ".env.example").read_text()
 
-    assert "LLM_BACKEND=openai" in env_example
+    assert "LLM_BACKEND=ollama" in env_example
     assert "OLLAMA_BASE_URL=http://host.docker.internal:11434" in env_example
     assert "OLLAMA_MODEL=llama3.2:latest" in env_example
     assert "OLLAMA_TIMEOUT_SECONDS=120" in env_example

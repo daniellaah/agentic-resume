@@ -8,21 +8,21 @@ An agentic resume tailoring tool that generates evidence-grounded resume variant
 uv sync
 ```
 
-Create a local `.env` file:
-
-```text
-LLM_BACKEND=openai
-OPENAI_API_KEY=...
-OPENAI_MODEL_NAME=gpt-5.5
-```
-
-For local Ollama:
+Create a local `.env` file. The default backend is local Ollama:
 
 ```text
 LLM_BACKEND=ollama
 OLLAMA_BASE_URL=http://host.docker.internal:11434
 OLLAMA_MODEL=llama3.2:latest
 OLLAMA_TIMEOUT_SECONDS=120
+```
+
+For OpenAI:
+
+```text
+LLM_BACKEND=openai
+OPENAI_API_KEY=...
+OPENAI_MODEL_NAME=gpt-5.5
 ```
 
 ## Run the API

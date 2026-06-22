@@ -27,7 +27,45 @@ def valid_job_analysis_payload() -> dict:
     }
 
 
-def test_structured_llm_uses_openai_by_default(monkeypatch):
+def test_structured_llm_uses_ollama_by_default(monkeypatch):
+    calls = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return None
+
+        def read(self):
+            return json.dumps(
+                {
+                    "message": {
+                        "content": json.dumps(valid_job_analysis_payload()),
+                    }
+                }
+            ).encode("utf-8")
+
+    def fake_urlopen(request, *, timeout):
+        calls["url"] = request.full_url
+        calls["payload"] = json.loads(request.data.decode("utf-8"))
+        return FakeResponse()
+
+    monkeypatch.delenv("LLM_BACKEND", raising=False)
+    monkeypatch.setattr(llm_backend_module.urllib.request, "urlopen", fake_urlopen)
+
+    payload = call_structured_llm(
+        system_prompt="system prompt",
+        user_content="user content",
+        response_model=JobAnalysis,
+    )
+
+    assert payload == valid_job_analysis_payload()
+    assert calls["url"] == "http://localhost:11434/api/chat"
+    assert calls["payload"]["model"] == "llama3.2:latest"
+
+
+def test_structured_llm_openai_backend_passes_model_prompt_and_schema(monkeypatch):
     calls = {}
 
     class FakeResponses:
@@ -46,7 +84,7 @@ def test_structured_llm_uses_openai_by_default(monkeypatch):
             calls["api_key"] = api_key
             self.responses = FakeResponses()
 
-    monkeypatch.delenv("LLM_BACKEND", raising=False)
+    monkeypatch.setenv("LLM_BACKEND", "openai")
     monkeypatch.setenv("OPENAI_API_KEY", "test-api-key")
     monkeypatch.setenv("OPENAI_MODEL_NAME", "test-openai-model")
     monkeypatch.setattr(llm_backend_module, "OpenAI", FakeOpenAI)

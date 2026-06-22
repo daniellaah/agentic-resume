@@ -98,9 +98,10 @@ def test_v9_flow_returns_agentic_tool_trace_without_network_access():
         "evidence_matching",
         "rewrite_candidate_builder",
         "rewrite_generation",
+        "claim_checker",
         "validation",
     ]
-    assert [step.step_number for step in result.steps] == [1, 2, 3, 4, 5, 6]
+    assert [step.step_number for step in result.steps] == [1, 2, 3, 4, 5, 6, 7]
     assert result.steps[-1].output_summary == (
         "0 validation issues (critical=0, warning=0)"
     )

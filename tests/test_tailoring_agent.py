@@ -107,6 +107,7 @@ def test_agentic_tailoring_accepts_first_safe_attempt():
         "evidence_matching",
         "rewrite_candidate_builder",
         "rewrite_generation",
+        "claim_checker",
         "validation",
     ]
     assert result.steps[-1].status == "success"
@@ -161,11 +162,63 @@ def test_agentic_tailoring_retries_after_validation_failure():
         for step in result.steps
         if step.tool_name == "rewrite_generation"
     ] == [1, 2]
+    assert [
+        step.status for step in result.steps if step.tool_name == "claim_checker"
+    ] == [
+        "failed",
+        "success",
+    ]
     assert result.final_result.status == "success"
     assert result.accepted_requirement_ids == ["req_1", "req_2"]
     assert result.rejected_requirement_ids == ["req_3"]
     assert feedback_seen[0] == []
     assert feedback_seen[1]
+
+
+def test_agentic_tailoring_retries_after_unsupported_claim():
+    feedback_seen = []
+
+    def fake_rewrite_provider(candidates, feedback):
+        feedback_seen.append(feedback)
+        if len(feedback_seen) == 1:
+            return {
+                "suggestions": [
+                    {
+                        "bullet_id": "exp_1_bullet_1",
+                        "rewritten_text": (
+                            "Built Python and FastAPI APIs deployed to Kubernetes."
+                        ),
+                        "requirement_ids": ["req_1", "req_2"],
+                    }
+                ]
+            }
+
+        assert feedback
+        assert any("Kubernetes" in issue.message for issue in feedback)
+        return valid_rewrite_payload()
+
+    result = tailor_resume_to_job_agentic(
+        resume_text="resume text",
+        jd_text="Backend Engineer JD",
+        resume_parser=fake_resume_parser,
+        job_analysis_provider=fake_job_analysis_provider,
+        rewrite_provider=fake_rewrite_provider,
+        max_attempts=2,
+    )
+
+    assert result.status == "success"
+    assert [attempt.status for attempt in result.attempts] == [
+        "rejected",
+        "accepted",
+    ]
+    assert [
+        step.status for step in result.steps if step.tool_name == "claim_checker"
+    ] == [
+        "failed",
+        "success",
+    ]
+    assert result.accepted_requirement_ids == ["req_1", "req_2"]
+    assert result.rejected_requirement_ids == []
 
 
 def test_agentic_tailoring_fails_after_max_attempts():
@@ -228,11 +281,16 @@ def test_agentic_tailoring_returns_no_candidate_result_without_supported_evidenc
     assert result.status == "no_rewrite_candidates"
     assert result.final_result.status == "success"
     assert result.attempts == []
-    assert [step.tool_name for step in result.steps[-2:]] == [
+    assert [step.tool_name for step in result.steps[-3:]] == [
         "rewrite_generation",
+        "claim_checker",
         "validation",
     ]
-    assert [step.status for step in result.steps[-2:]] == ["skipped", "skipped"]
+    assert [step.status for step in result.steps[-3:]] == [
+        "skipped",
+        "skipped",
+        "skipped",
+    ]
     assert result.missing_requirement_ids == ["req_1"]
 
 

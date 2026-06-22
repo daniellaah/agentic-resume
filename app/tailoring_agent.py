@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.claim_checker import check_rewrite_claims
 from app.evidence_matcher import match_evidence
 from app.job_analysis import JobAnalysisPayloadProvider, analyze_job_description
 from app.models import (
@@ -30,7 +31,7 @@ from app.tailoring import (
 )
 from app.validator import validate_resume_tailoring
 
-AGENT_WORKFLOW_VERSION = "v9"
+AGENT_WORKFLOW_VERSION = "v10"
 DEFAULT_MAX_ATTEMPTS = 2
 
 AgentAttemptStatus = Literal["accepted", "rejected", "output_error"]
@@ -41,6 +42,7 @@ AgentToolName = Literal[
     "evidence_matching",
     "rewrite_candidate_builder",
     "rewrite_generation",
+    "claim_checker",
     "validation",
 ]
 AgenticTailoringStatus = Literal[
@@ -168,6 +170,15 @@ def tailor_resume_to_job_agentic(
         steps.append(
             _build_step(
                 steps=steps,
+                tool_name="claim_checker",
+                status="skipped",
+                output_summary="0 claim issues",
+                message="No rewrite suggestions were generated.",
+            )
+        )
+        steps.append(
+            _build_step(
+                steps=steps,
                 tool_name="validation",
                 status="skipped",
                 output_summary="0 validation issues",
@@ -218,6 +229,16 @@ def tailor_resume_to_job_agentic(
             steps.append(
                 _build_step(
                     steps=steps,
+                    tool_name="claim_checker",
+                    status="skipped",
+                    output_summary="0 claim issues",
+                    message="Rewrite output could not be parsed.",
+                    attempt_number=attempt_number,
+                )
+            )
+            steps.append(
+                _build_step(
+                    steps=steps,
                     tool_name="validation",
                     status="skipped",
                     output_summary="0 validation issues",
@@ -250,13 +271,34 @@ def tailor_resume_to_job_agentic(
             )
         )
 
-        validation_issues = _validate_agent_rewrite_attempt(
+        claim_issues = _check_rewrite_claims_for_suggestions(
             resume=resume,
-            job_analysis=job_analysis,
-            evidence_matches=evidence_matches,
-            candidates=candidates,
             rewrite_suggestions=rewrite_suggestions,
         )
+        claim_critical_issues = [
+            issue for issue in claim_issues if issue.severity == "critical"
+        ]
+        steps.append(
+            _build_step(
+                steps=steps,
+                tool_name="claim_checker",
+                status="failed" if claim_critical_issues else "success",
+                input_summary=_claim_check_input_summary(rewrite_suggestions),
+                output_summary=_claim_check_output_summary(claim_issues),
+                attempt_number=attempt_number,
+            )
+        )
+
+        validation_issues = [
+            *_validate_agent_rewrite_attempt(
+                resume=resume,
+                job_analysis=job_analysis,
+                evidence_matches=evidence_matches,
+                candidates=candidates,
+                rewrite_suggestions=rewrite_suggestions,
+            ),
+            *claim_issues,
+        ]
         critical_issues = [
             issue for issue in validation_issues if issue.severity == "critical"
         ]
@@ -425,6 +467,35 @@ def _output_error_to_validation_issue(error: RewriteOutputError) -> ValidationIs
         severity="critical",
         message=str(error),
     )
+
+
+def _check_rewrite_claims_for_suggestions(
+    resume: Resume,
+    rewrite_suggestions: list[RewriteSuggestion],
+) -> list[ValidationIssue]:
+    bullet_text_by_id = _bullet_text_by_id(resume)
+    issues: list[ValidationIssue] = []
+
+    for suggestion in rewrite_suggestions:
+        source_text = bullet_text_by_id.get(suggestion.bullet_id)
+        if source_text is None:
+            continue
+        issues.extend(
+            check_rewrite_claims(
+                source_text=source_text,
+                rewritten_text=suggestion.rewritten_text,
+            )
+        )
+
+    return issues
+
+
+def _bullet_text_by_id(resume: Resume) -> dict[str, str]:
+    return {
+        bullet.id: bullet.text
+        for experience in resume.experience
+        for bullet in experience.bullets
+    }
 
 
 def _build_tailoring_result(
@@ -611,6 +682,18 @@ def _rewrite_generation_output_summary(
         f"{len(rewrite_suggestions)} rewrite suggestions covering "
         f"{requirement_count} requirements"
     )
+
+
+def _claim_check_input_summary(
+    rewrite_suggestions: list[RewriteSuggestion],
+) -> str:
+    return f"{len(rewrite_suggestions)} rewrite suggestions"
+
+
+def _claim_check_output_summary(
+    claim_issues: list[ValidationIssue],
+) -> str:
+    return f"{len(claim_issues)} claim issues"
 
 
 def _validation_input_summary(

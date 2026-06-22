@@ -67,6 +67,10 @@ class RewriteOutputError(RewriteGenerationError, ValueError):
 class UnsafeRewriteError(RewriteGenerationError, ValueError):
     """Raised when generated rewrite suggestions fail validation."""
 
+    def __init__(self, issues: list[ValidationIssue]):
+        self.issues = issues
+        super().__init__(_format_critical_issues(issues))
+
 
 class MissingOpenAIAPIKeyError(RewriteGenerationError, RuntimeError):
     """Raised when the OpenAI provider is used without an API key."""
@@ -232,7 +236,7 @@ def _validate_suggestions_with_tailoring_validator(
     critical_issues = [issue for issue in issues if issue.severity == "critical"]
 
     if critical_issues:
-        raise UnsafeRewriteError(_format_critical_issues(critical_issues))
+        raise UnsafeRewriteError(critical_issues)
 
 
 def _format_critical_issues(issues: list[ValidationIssue]) -> str:

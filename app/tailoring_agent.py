@@ -38,7 +38,7 @@ from app.tailoring import (
 )
 from app.validator import validate_resume_tailoring
 
-AGENT_WORKFLOW_VERSION = "v17"
+AGENT_WORKFLOW_VERSION = "v18"
 DEFAULT_MAX_ATTEMPTS = 2
 ORCHESTRATOR_AGENT_NAME = "resume_tailoring_orchestrator_agent"
 
@@ -352,7 +352,7 @@ def _build_tailoring_agent_trace(max_attempts: int) -> AgentTrace:
 
 def _build_tailoring_agent_plan(max_attempts: int) -> AgentPlan:
     return AgentPlan(
-        plan_id="resume_tailoring_v17",
+        plan_id="resume_tailoring_v18",
         orchestrator_agent=ORCHESTRATOR_AGENT_NAME,
         objective=(
             "Generate evidence-grounded resume rewrites for a target job "

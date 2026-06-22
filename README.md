@@ -53,6 +53,8 @@ Open:
 http://127.0.0.1:3000
 ```
 
+The frontend can create async agent runs and auto-refresh active traces.
+
 ## Test
 
 ```bash

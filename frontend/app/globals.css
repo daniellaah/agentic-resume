@@ -245,6 +245,45 @@ h2 {
   gap: 16px;
 }
 
+.monitorBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: var(--surface);
+}
+
+.monitorBar > div,
+.monitorMeta {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.monitorBar > div {
+  gap: 10px;
+}
+
+.monitorBar h2,
+.monitorBar p {
+  margin: 0;
+}
+
+.monitorBar p,
+.monitorMeta {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.monitorMeta {
+  justify-content: flex-end;
+  gap: 10px;
+  white-space: nowrap;
+}
+
 .sectionBand {
   padding: 16px;
 }
@@ -470,6 +509,16 @@ th {
   .planGrid,
   .finalGrid {
     grid-template-columns: 1fr;
+  }
+
+  .monitorBar,
+  .monitorMeta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .monitorMeta {
+    white-space: normal;
   }
 
   .sidePanel {

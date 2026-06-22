@@ -41,23 +41,43 @@ def test_frontend_package_defines_trace_viewer_runtime_scripts():
     assert '"typecheck": "next typegen && tsc --noEmit"' in package_json
     assert '"next":' in package_json
     assert '"lucide-react":' in package_json
+    assert '"@tanstack/react-query":' in package_json
 
 
 def test_frontend_defines_agent_run_intake_flow():
-    page = (ROOT_DIR / "frontend" / "app" / "page.tsx").read_text()
+    workspace = (ROOT_DIR / "frontend" / "app" / "agent-run-workspace.tsx").read_text()
     route_handler = (
         ROOT_DIR / "frontend" / "app" / "agent-runs" / "route.ts"
     ).read_text()
     api_client = (ROOT_DIR / "frontend" / "lib" / "api.ts").read_text()
 
-    assert 'action="/agent-runs"' in page
-    assert 'name="resumeText"' in page
-    assert 'name="jobDescriptionText"' in page
-    assert 'name="maxAttempts"' in page
+    assert 'action="/agent-runs"' in workspace
+    assert 'name="resumeText"' in workspace
+    assert 'name="jobDescriptionText"' in workspace
+    assert 'name="maxAttempts"' in workspace
     assert "createAgentRun" in route_handler
     assert 'url.searchParams.set("jobId", result.job.job_id)' in route_handler
     assert "POST" in api_client
     assert "`${API_URL}/agent-runs`" in api_client
+
+
+def test_frontend_defines_live_trace_monitoring_flow():
+    workspace = (ROOT_DIR / "frontend" / "app" / "agent-run-workspace.tsx").read_text()
+    layout = (ROOT_DIR / "frontend" / "app" / "layout.tsx").read_text()
+    query_provider = (ROOT_DIR / "frontend" / "app" / "query-provider.tsx").read_text()
+    proxy_route = (
+        ROOT_DIR / "frontend" / "app" / "agent-runs" / "[jobId]" / "trace" / "route.ts"
+    ).read_text()
+    client_api = (ROOT_DIR / "frontend" / "lib" / "client-api.ts").read_text()
+
+    assert "QueryProvider" in layout
+    assert "QueryClientProvider" in query_provider
+    assert "useQuery<TraceLoadResult>" in workspace
+    assert "TRACE_REFETCH_INTERVAL_MS" in workspace
+    assert 'status === "queued" || status === "running"' in workspace
+    assert "loadAgentRunTraceFromClient" in workspace
+    assert "/agent-runs/${encodeURIComponent(normalizedJobId)}/trace" in client_api
+    assert "loadAgentRunTrace(jobId)" in proxy_route
 
 
 def test_frontend_dockerfile_builds_standalone_next_app():

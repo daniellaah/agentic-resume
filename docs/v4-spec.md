@@ -24,10 +24,17 @@ by a CLI, API, web UI, notebook, or batch runner.
 Provider injection is required so tests can run without network access while
 production usage can still call OpenAI-backed providers.
 
+The default resume parser only supports the structured sample resume text
+format used by this repository. V4 does not claim to support arbitrary resume
+text, PDF files, DOCX files, or LinkedIn exports. Future API versions must make
+this limitation explicit in their request contract until a broader resume
+parsing layer exists.
+
 ## Outputs
 
 `TailoringResult` contains:
 
+- `metadata`: pipeline metadata
 - `resume`: parsed `Resume`
 - `job_analysis`: structured `JobAnalysis`
 - `evidence_matches`: generated `EvidenceMatch[]`
@@ -73,9 +80,20 @@ and no critical issues.
 `failed_validation` means validation returned one or more critical issues, or
 the rewrite generator rejected generated suggestions as unsafe.
 
+## Metadata
+
+V4.1 adds response metadata so API consumers can identify the pipeline contract
+used to produce a result.
+
+Current metadata fields:
+
+- `pipeline_version`: currently `v4.1`
+- `resume_input_format`: currently `structured_sample_resume`
+
 If rewrite generation fails validation, V4 should return a `TailoringResult`
 with:
 
+- the metadata
 - the parsed resume
 - the job analysis
 - the evidence matches

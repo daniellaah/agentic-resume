@@ -13,7 +13,13 @@ from app.models import (
     ValidationIssue,
 )
 from app.rewrite_generator import UnsafeRewriteError
-from app.tailoring import TailoringResult, tailor_resume_to_job
+from app.tailoring import (
+    DEFAULT_RESUME_INPUT_FORMAT,
+    PIPELINE_VERSION,
+    TailoringMetadata,
+    TailoringResult,
+    tailor_resume_to_job,
+)
 
 
 def make_resume() -> Resume:
@@ -85,6 +91,8 @@ def test_tailor_resume_to_job_returns_success_result():
 
     assert isinstance(result, TailoringResult)
     assert result.status == "success"
+    assert result.metadata.pipeline_version == PIPELINE_VERSION
+    assert result.metadata.resume_input_format == DEFAULT_RESUME_INPUT_FORMAT
     assert result.validation_issues == []
     assert result.job_analysis.job_title == "Backend Engineer"
     assert [match.status for match in result.evidence_matches] == [
@@ -175,6 +183,10 @@ def test_tailor_resume_to_job_propagates_provider_output_errors():
 
 def test_tailoring_result_accepts_failed_validation_status():
     result = TailoringResult(
+        metadata=TailoringMetadata(
+            pipeline_version=PIPELINE_VERSION,
+            resume_input_format=DEFAULT_RESUME_INPUT_FORMAT,
+        ),
         resume=make_resume(),
         job_analysis=JobAnalysis(
             requirements=[

@@ -22,9 +22,17 @@ from app.validator import validate_resume_tailoring
 
 TailoringStatus = Literal["success", "completed_with_warnings", "failed_validation"]
 ResumeParser = Callable[[str], Resume]
+PIPELINE_VERSION = "v4.1"
+DEFAULT_RESUME_INPUT_FORMAT = "structured_sample_resume"
+
+
+class TailoringMetadata(BaseModel):
+    pipeline_version: str
+    resume_input_format: str
 
 
 class TailoringResult(BaseModel):
+    metadata: TailoringMetadata
     resume: Resume
     job_analysis: JobAnalysis
     evidence_matches: list[EvidenceMatch]
@@ -58,6 +66,7 @@ def tailor_resume_to_job(
     except UnsafeRewriteError as error:
         return TailoringResult(
             resume=resume,
+            metadata=_build_metadata(),
             job_analysis=job_analysis,
             evidence_matches=evidence_matches,
             rewrite_suggestions=[],
@@ -74,6 +83,7 @@ def tailor_resume_to_job(
 
     return TailoringResult(
         resume=resume,
+        metadata=_build_metadata(),
         job_analysis=job_analysis,
         evidence_matches=evidence_matches,
         rewrite_suggestions=rewrite_suggestions,
@@ -90,3 +100,10 @@ def _status_for_validation_issues(
     if validation_issues:
         return "completed_with_warnings"
     return "success"
+
+
+def _build_metadata() -> TailoringMetadata:
+    return TailoringMetadata(
+        pipeline_version=PIPELINE_VERSION,
+        resume_input_format=DEFAULT_RESUME_INPUT_FORMAT,
+    )

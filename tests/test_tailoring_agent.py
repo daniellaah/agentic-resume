@@ -10,6 +10,7 @@ from app.models import (
 from app.tailoring_agent import (
     AGENT_WORKFLOW_VERSION,
     DEFAULT_MAX_ATTEMPTS,
+    ORCHESTRATOR_AGENT_NAME,
     tailor_resume_to_job_agentic,
 )
 
@@ -99,6 +100,18 @@ def test_agentic_tailoring_accepts_first_safe_attempt():
     assert result.status == "success"
     assert result.metadata.workflow_version == AGENT_WORKFLOW_VERSION
     assert result.metadata.max_attempts == DEFAULT_MAX_ATTEMPTS
+    assert result.plan is not None
+    assert result.plan.orchestrator_agent == ORCHESTRATOR_AGENT_NAME
+    assert result.plan.max_iterations == DEFAULT_MAX_ATTEMPTS
+    assert [item.agent_name for item in result.plan.items] == [
+        "resume_intake_agent",
+        "jd_analysis_agent",
+        "evidence_mapper_agent",
+        "tailoring_strategy_agent",
+        "rewrite_agent",
+        "fact_critic_agent",
+        "domain_validator_agent",
+    ]
     assert result.final_result.status == "success"
     assert [attempt.status for attempt in result.attempts] == ["accepted"]
     assert [step.tool_name for step in result.steps] == [
@@ -110,8 +123,31 @@ def test_agentic_tailoring_accepts_first_safe_attempt():
         "claim_checker",
         "validation",
     ]
+    assert [step.agent_name for step in result.steps] == [
+        "resume_intake_agent",
+        "jd_analysis_agent",
+        "evidence_mapper_agent",
+        "tailoring_strategy_agent",
+        "rewrite_agent",
+        "fact_critic_agent",
+        "domain_validator_agent",
+    ]
+    assert [step.role for step in result.steps] == [
+        "specialist",
+        "specialist",
+        "specialist",
+        "specialist",
+        "specialist",
+        "critic",
+        "critic",
+    ]
     assert result.steps[-1].status == "success"
     assert result.steps[-1].attempt_number == 1
+    assert [decision.decision_type for decision in result.decisions] == [
+        "plan",
+        "accept",
+    ]
+    assert result.decisions[-1].agent_name == ORCHESTRATOR_AGENT_NAME
     assert calls[0]["feedback"] == []
     assert result.accepted_requirement_ids == ["req_1", "req_2"]
     assert result.missing_requirement_ids == ["req_3"]
@@ -171,6 +207,13 @@ def test_agentic_tailoring_retries_after_validation_failure():
     assert result.final_result.status == "success"
     assert result.accepted_requirement_ids == ["req_1", "req_2"]
     assert result.rejected_requirement_ids == ["req_3"]
+    assert [decision.decision_type for decision in result.decisions] == [
+        "plan",
+        "retry",
+        "accept",
+    ]
+    assert result.decisions[1].feedback_issue_count > 0
+    assert result.decisions[1].next_agent == "rewrite_agent"
     assert feedback_seen[0] == []
     assert feedback_seen[1]
 
@@ -251,6 +294,11 @@ def test_agentic_tailoring_fails_after_max_attempts():
         "rejected",
         "rejected",
     ]
+    assert [decision.decision_type for decision in result.decisions] == [
+        "plan",
+        "retry",
+        "reject",
+    ]
     assert result.rejected_requirement_ids == ["req_1", "req_3"]
 
 
@@ -290,6 +338,10 @@ def test_agentic_tailoring_returns_no_candidate_result_without_supported_evidenc
         "skipped",
         "skipped",
         "skipped",
+    ]
+    assert [decision.decision_type for decision in result.decisions] == [
+        "plan",
+        "skip",
     ]
     assert result.missing_requirement_ids == ["req_1"]
 

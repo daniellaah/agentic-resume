@@ -4,6 +4,13 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.agent_runtime import (
+    AgentDecision,
+    AgentPlan,
+    AgentPlanItem,
+    AgentStep,
+    AgentTrace,
+)
 from app.claim_checker import check_rewrite_claims
 from app.evidence_matcher import match_evidence
 from app.job_analysis import JobAnalysisPayloadProvider, analyze_job_description
@@ -31,20 +38,11 @@ from app.tailoring import (
 )
 from app.validator import validate_resume_tailoring
 
-AGENT_WORKFLOW_VERSION = "v10"
+AGENT_WORKFLOW_VERSION = "v11"
 DEFAULT_MAX_ATTEMPTS = 2
+ORCHESTRATOR_AGENT_NAME = "resume_tailoring_orchestrator_agent"
 
 AgentAttemptStatus = Literal["accepted", "rejected", "output_error"]
-AgentStepStatus = Literal["success", "failed", "skipped"]
-AgentToolName = Literal[
-    "resume_input",
-    "job_analysis",
-    "evidence_matching",
-    "rewrite_candidate_builder",
-    "rewrite_generation",
-    "claim_checker",
-    "validation",
-]
 AgenticTailoringStatus = Literal[
     "success",
     "failed_validation",
@@ -71,20 +69,12 @@ class TailoringAttempt(BaseModel):
     message: str | None = None
 
 
-class AgentStep(BaseModel):
-    step_number: int = Field(ge=1)
-    tool_name: AgentToolName
-    status: AgentStepStatus
-    input_summary: str | None = None
-    output_summary: str | None = None
-    message: str | None = None
-    attempt_number: int | None = Field(default=None, ge=1)
-
-
 class AgenticTailoringResult(BaseModel):
     metadata: AgenticTailoringMetadata
     final_result: TailoringResult
+    plan: AgentPlan | None = None
     steps: list[AgentStep] = Field(default_factory=list)
+    decisions: list[AgentDecision] = Field(default_factory=list)
     attempts: list[TailoringAttempt] = Field(default_factory=list)
     missing_requirement_ids: list[str] = Field(default_factory=list)
     accepted_requirement_ids: list[str] = Field(default_factory=list)
@@ -104,41 +94,41 @@ def tailor_resume_to_job_agentic(
     if max_attempts < 1:
         raise ValueError("max_attempts must be at least 1.")
 
-    steps: list[AgentStep] = []
+    trace = _build_tailoring_agent_trace(max_attempts)
+    trace.record_decision(
+        decision_type="plan",
+        reason=(
+            "Use the evidence-grounded resume tailoring plan with specialist "
+            "agents and critic feedback."
+        ),
+        next_agent="resume_intake_agent",
+    )
+
     resume = resume_parser(resume_text)
-    steps.append(
-        _build_step(
-            steps=steps,
-            tool_name="resume_input",
-            status="success",
-            input_summary=_text_input_summary(resume_text),
-            output_summary=_resume_output_summary(resume),
-        )
+    trace.record_step(
+        tool_name="resume_input",
+        status="success",
+        input_summary=_text_input_summary(resume_text),
+        output_summary=_resume_output_summary(resume),
     )
 
     job_analysis = analyze_job_description(
         jd_text,
         payload_provider=job_analysis_provider,
     )
-    steps.append(
-        _build_step(
-            steps=steps,
-            tool_name="job_analysis",
-            status="success",
-            input_summary=_text_input_summary(jd_text),
-            output_summary=_job_analysis_output_summary(job_analysis),
-        )
+    trace.record_step(
+        tool_name="job_analysis",
+        status="success",
+        input_summary=_text_input_summary(jd_text),
+        output_summary=_job_analysis_output_summary(job_analysis),
     )
 
     evidence_matches = match_evidence(resume, job_analysis)
-    steps.append(
-        _build_step(
-            steps=steps,
-            tool_name="evidence_matching",
-            status="success",
-            input_summary=_evidence_matching_input_summary(resume, job_analysis),
-            output_summary=_evidence_matching_output_summary(evidence_matches),
-        )
+    trace.record_step(
+        tool_name="evidence_matching",
+        status="success",
+        input_summary=_evidence_matching_input_summary(resume, job_analysis),
+        output_summary=_evidence_matching_output_summary(evidence_matches),
     )
 
     missing_requirement_ids = _missing_requirement_ids(evidence_matches)
@@ -147,43 +137,36 @@ def tailor_resume_to_job_agentic(
         job_analysis=job_analysis,
         evidence_matches=evidence_matches,
     )
-    steps.append(
-        _build_step(
-            steps=steps,
-            tool_name="rewrite_candidate_builder",
-            status="success",
-            input_summary=_rewrite_candidate_input_summary(evidence_matches),
-            output_summary=_rewrite_candidate_output_summary(candidates),
-        )
+    trace.record_step(
+        tool_name="rewrite_candidate_builder",
+        status="success",
+        input_summary=_rewrite_candidate_input_summary(evidence_matches),
+        output_summary=_rewrite_candidate_output_summary(candidates),
     )
 
     if not candidates:
-        steps.append(
-            _build_step(
-                steps=steps,
-                tool_name="rewrite_generation",
-                status="skipped",
-                output_summary="0 rewrite candidates",
-                message="No supported evidence was available for rewrite generation.",
-            )
+        trace.record_step(
+            tool_name="rewrite_generation",
+            status="skipped",
+            output_summary="0 rewrite candidates",
+            message="No supported evidence was available for rewrite generation.",
         )
-        steps.append(
-            _build_step(
-                steps=steps,
-                tool_name="claim_checker",
-                status="skipped",
-                output_summary="0 claim issues",
-                message="No rewrite suggestions were generated.",
-            )
+        trace.record_step(
+            tool_name="claim_checker",
+            status="skipped",
+            output_summary="0 claim issues",
+            message="No rewrite suggestions were generated.",
         )
-        steps.append(
-            _build_step(
-                steps=steps,
-                tool_name="validation",
-                status="skipped",
-                output_summary="0 validation issues",
-                message="No rewrite suggestions were generated.",
-            )
+        trace.record_step(
+            tool_name="validation",
+            status="skipped",
+            output_summary="0 validation issues",
+            message="No rewrite suggestions were generated.",
+        )
+        trace.record_decision(
+            decision_type="skip",
+            reason="No supported evidence was available for rewrite generation.",
+            next_agent=None,
         )
         final_result = _build_tailoring_result(
             resume=resume,
@@ -194,7 +177,7 @@ def tailor_resume_to_job_agentic(
         )
         return _build_agentic_result(
             final_result=final_result,
-            steps=steps,
+            trace=trace,
             attempts=[],
             missing_requirement_ids=missing_requirement_ids,
             status="no_rewrite_candidates",
@@ -212,39 +195,30 @@ def tailor_resume_to_job_agentic(
             rewrite_suggestions = parse_rewrite_payload(payload)
         except RewriteOutputError as error:
             output_issue = _output_error_to_validation_issue(error)
-            steps.append(
-                _build_step(
-                    steps=steps,
-                    tool_name="rewrite_generation",
-                    status="failed",
-                    input_summary=_rewrite_generation_input_summary(
-                        candidates=candidates,
-                        feedback=attempt_feedback,
-                    ),
-                    output_summary="0 rewrite suggestions",
-                    message=str(error),
-                    attempt_number=attempt_number,
-                )
+            trace.record_step(
+                tool_name="rewrite_generation",
+                status="failed",
+                input_summary=_rewrite_generation_input_summary(
+                    candidates=candidates,
+                    feedback=attempt_feedback,
+                ),
+                output_summary="0 rewrite suggestions",
+                message=str(error),
+                attempt_number=attempt_number,
             )
-            steps.append(
-                _build_step(
-                    steps=steps,
-                    tool_name="claim_checker",
-                    status="skipped",
-                    output_summary="0 claim issues",
-                    message="Rewrite output could not be parsed.",
-                    attempt_number=attempt_number,
-                )
+            trace.record_step(
+                tool_name="claim_checker",
+                status="skipped",
+                output_summary="0 claim issues",
+                message="Rewrite output could not be parsed.",
+                attempt_number=attempt_number,
             )
-            steps.append(
-                _build_step(
-                    steps=steps,
-                    tool_name="validation",
-                    status="skipped",
-                    output_summary="0 validation issues",
-                    message="Rewrite output could not be parsed.",
-                    attempt_number=attempt_number,
-                )
+            trace.record_step(
+                tool_name="validation",
+                status="skipped",
+                output_summary="0 validation issues",
+                message="Rewrite output could not be parsed.",
+                attempt_number=attempt_number,
             )
             feedback = [output_issue]
             attempts.append(
@@ -255,20 +229,24 @@ def tailor_resume_to_job_agentic(
                     message=str(error),
                 )
             )
+            trace.record_decision(
+                decision_type="retry" if attempt_number < max_attempts else "reject",
+                reason="Rewrite output could not be parsed.",
+                next_agent="rewrite_agent" if attempt_number < max_attempts else None,
+                attempt_number=attempt_number,
+                feedback_issue_count=len(feedback),
+            )
             continue
 
-        steps.append(
-            _build_step(
-                steps=steps,
-                tool_name="rewrite_generation",
-                status="success",
-                input_summary=_rewrite_generation_input_summary(
-                    candidates=candidates,
-                    feedback=attempt_feedback,
-                ),
-                output_summary=_rewrite_generation_output_summary(rewrite_suggestions),
-                attempt_number=attempt_number,
-            )
+        trace.record_step(
+            tool_name="rewrite_generation",
+            status="success",
+            input_summary=_rewrite_generation_input_summary(
+                candidates=candidates,
+                feedback=attempt_feedback,
+            ),
+            output_summary=_rewrite_generation_output_summary(rewrite_suggestions),
+            attempt_number=attempt_number,
         )
 
         claim_issues = _check_rewrite_claims_for_suggestions(
@@ -278,15 +256,12 @@ def tailor_resume_to_job_agentic(
         claim_critical_issues = [
             issue for issue in claim_issues if issue.severity == "critical"
         ]
-        steps.append(
-            _build_step(
-                steps=steps,
-                tool_name="claim_checker",
-                status="failed" if claim_critical_issues else "success",
-                input_summary=_claim_check_input_summary(rewrite_suggestions),
-                output_summary=_claim_check_output_summary(claim_issues),
-                attempt_number=attempt_number,
-            )
+        trace.record_step(
+            tool_name="claim_checker",
+            status="failed" if claim_critical_issues else "success",
+            input_summary=_claim_check_input_summary(rewrite_suggestions),
+            output_summary=_claim_check_output_summary(claim_issues),
+            attempt_number=attempt_number,
         )
 
         validation_issues = [
@@ -302,15 +277,12 @@ def tailor_resume_to_job_agentic(
         critical_issues = [
             issue for issue in validation_issues if issue.severity == "critical"
         ]
-        steps.append(
-            _build_step(
-                steps=steps,
-                tool_name="validation",
-                status="failed" if critical_issues else "success",
-                input_summary=_validation_input_summary(rewrite_suggestions),
-                output_summary=_validation_output_summary(validation_issues),
-                attempt_number=attempt_number,
-            )
+        trace.record_step(
+            tool_name="validation",
+            status="failed" if critical_issues else "success",
+            input_summary=_validation_input_summary(rewrite_suggestions),
+            output_summary=_validation_output_summary(validation_issues),
+            attempt_number=attempt_number,
         )
         attempt_status: AgentAttemptStatus = (
             "rejected" if critical_issues else "accepted"
@@ -325,6 +297,12 @@ def tailor_resume_to_job_agentic(
         )
 
         if not critical_issues:
+            trace.record_decision(
+                decision_type="accept",
+                reason="The rewrite attempt passed critic and domain validation.",
+                next_agent=None,
+                attempt_number=attempt_number,
+            )
             final_result = _build_tailoring_result(
                 resume=resume,
                 job_analysis=job_analysis,
@@ -334,7 +312,7 @@ def tailor_resume_to_job_agentic(
             )
             return _build_agentic_result(
                 final_result=final_result,
-                steps=steps,
+                trace=trace,
                 attempts=attempts,
                 missing_requirement_ids=missing_requirement_ids,
                 status="success",
@@ -342,6 +320,13 @@ def tailor_resume_to_job_agentic(
             )
 
         feedback = critical_issues
+        trace.record_decision(
+            decision_type="retry" if attempt_number < max_attempts else "reject",
+            reason="Critical validation issues require another rewrite attempt.",
+            next_agent="rewrite_agent" if attempt_number < max_attempts else None,
+            attempt_number=attempt_number,
+            feedback_issue_count=len(feedback),
+        )
 
     last_attempt = attempts[-1]
     final_result = _build_tailoring_result(
@@ -353,11 +338,105 @@ def tailor_resume_to_job_agentic(
     )
     return _build_agentic_result(
         final_result=final_result,
-        steps=steps,
+        trace=trace,
         attempts=attempts,
         missing_requirement_ids=missing_requirement_ids,
         status="failed_validation",
         max_attempts=max_attempts,
+    )
+
+
+def _build_tailoring_agent_trace(max_attempts: int) -> AgentTrace:
+    return AgentTrace(plan=_build_tailoring_agent_plan(max_attempts))
+
+
+def _build_tailoring_agent_plan(max_attempts: int) -> AgentPlan:
+    return AgentPlan(
+        plan_id="resume_tailoring_v11",
+        orchestrator_agent=ORCHESTRATOR_AGENT_NAME,
+        objective=(
+            "Generate evidence-grounded resume rewrites for a target job "
+            "description without introducing unsupported claims."
+        ),
+        max_iterations=max_attempts,
+        items=[
+            AgentPlanItem(
+                step_id="resume_input",
+                agent_name="resume_intake_agent",
+                role="specialist",
+                tool_name="resume_input",
+                objective="Parse raw resume text into the structured Resume model.",
+            ),
+            AgentPlanItem(
+                step_id="job_analysis",
+                agent_name="jd_analysis_agent",
+                role="specialist",
+                tool_name="job_analysis",
+                objective=(
+                    "Extract normalized job requirements and role metadata from "
+                    "the job description."
+                ),
+                depends_on=["resume_input"],
+            ),
+            AgentPlanItem(
+                step_id="evidence_matching",
+                agent_name="evidence_mapper_agent",
+                role="specialist",
+                tool_name="evidence_matching",
+                objective=(
+                    "Map job requirements to resume evidence and identify missing "
+                    "or weakly supported requirements."
+                ),
+                depends_on=["resume_input", "job_analysis"],
+            ),
+            AgentPlanItem(
+                step_id="rewrite_candidate_builder",
+                agent_name="tailoring_strategy_agent",
+                role="specialist",
+                tool_name="rewrite_candidate_builder",
+                objective=(
+                    "Choose evidence-supported bullets and requirements that are "
+                    "safe to send to the rewrite agent."
+                ),
+                depends_on=["evidence_matching"],
+            ),
+            AgentPlanItem(
+                step_id="rewrite_generation",
+                agent_name="rewrite_agent",
+                role="specialist",
+                tool_name="rewrite_generation",
+                objective=(
+                    "Generate tailored bullet rewrites using candidate evidence "
+                    "and critic feedback."
+                ),
+                depends_on=["rewrite_candidate_builder"],
+                repeatable=True,
+            ),
+            AgentPlanItem(
+                step_id="claim_checker",
+                agent_name="fact_critic_agent",
+                role="critic",
+                tool_name="claim_checker",
+                objective=(
+                    "Reject rewrites that introduce unsupported technology, "
+                    "metric, scale, or impact claims."
+                ),
+                depends_on=["rewrite_generation"],
+                repeatable=True,
+            ),
+            AgentPlanItem(
+                step_id="validation",
+                agent_name="domain_validator_agent",
+                role="critic",
+                tool_name="validation",
+                objective=(
+                    "Validate rewrite structure, requirement coverage, and "
+                    "evidence boundaries before acceptance."
+                ),
+                depends_on=["claim_checker"],
+                repeatable=True,
+            ),
+        ],
     )
 
 
@@ -528,7 +607,7 @@ def _tailoring_status_for_issues(
 
 def _build_agentic_result(
     final_result: TailoringResult,
-    steps: list[AgentStep],
+    trace: AgentTrace,
     attempts: list[TailoringAttempt],
     missing_requirement_ids: list[str],
     status: AgenticTailoringStatus,
@@ -556,7 +635,9 @@ def _build_agentic_result(
             max_attempts=max_attempts,
         ),
         final_result=final_result,
-        steps=steps,
+        plan=trace.plan,
+        steps=trace.steps,
+        decisions=trace.decisions,
         attempts=attempts,
         missing_requirement_ids=missing_requirement_ids,
         accepted_requirement_ids=accepted_requirement_ids,
@@ -582,26 +663,6 @@ def _requirement_ids_from_suggestions(
             for suggestion in suggestions
             for requirement_id in suggestion.requirement_ids
         }
-    )
-
-
-def _build_step(
-    steps: list[AgentStep],
-    tool_name: AgentToolName,
-    status: AgentStepStatus,
-    input_summary: str | None = None,
-    output_summary: str | None = None,
-    message: str | None = None,
-    attempt_number: int | None = None,
-) -> AgentStep:
-    return AgentStep(
-        step_number=len(steps) + 1,
-        tool_name=tool_name,
-        status=status,
-        input_summary=input_summary,
-        output_summary=output_summary,
-        message=message,
-        attempt_number=attempt_number,
     )
 
 

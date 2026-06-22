@@ -1,0 +1,72 @@
+services:
+  api:
+    build: .
+    command: uvicorn app.api:app --host 0.0.0.0 --port 8000
+    environment:
+      AGENT_JOB_QUEUE_NAME: agentic-tailoring
+      DATABASE_URL: postgresql+psycopg://agentic_resume:agentic_resume@postgres:5432/agentic_resume
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL_NAME: ${OPENAI_MODEL_NAME:-gpt-5.5}
+      REDIS_URL: redis://redis:6379/0
+      RUN_OPENAI_INTEGRATION: ${RUN_OPENAI_INTEGRATION:-0}
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: python -m app.worker
+    environment:
+      AGENT_JOB_QUEUE_NAME: agentic-tailoring
+      DATABASE_URL: postgresql+psycopg://agentic_resume:agentic_resume@postgres:5432/agentic_resume
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL_NAME: ${OPENAI_MODEL_NAME:-gpt-5.5}
+      REDIS_URL: redis://redis:6379/0
+      RUN_OPENAI_INTEGRATION: ${RUN_OPENAI_INTEGRATION:-0}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  migrate:
+    build: .
+    command: alembic upgrade head
+    environment:
+      DATABASE_URL: postgresql+psycopg://agentic_resume:agentic_resume@postgres:5432/agentic_resume
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: agentic_resume
+      POSTGRES_PASSWORD: agentic_resume
+      POSTGRES_USER: agentic_resume
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentic_resume -d agentic_resume"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:

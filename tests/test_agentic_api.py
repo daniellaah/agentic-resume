@@ -13,8 +13,10 @@ from app.models import (
 )
 from app.tailoring import TailoringMetadata, TailoringResult
 from app.tailoring_agent import (
+    AGENT_WORKFLOW_VERSION,
     AgenticTailoringMetadata,
     AgenticTailoringResult,
+    AgentStep,
     TailoringAttempt,
 )
 
@@ -81,11 +83,26 @@ def make_agentic_result() -> AgenticTailoringResult:
     )
     return AgenticTailoringResult(
         metadata=AgenticTailoringMetadata(
-            workflow_version="v8",
+            workflow_version=AGENT_WORKFLOW_VERSION,
             pipeline_metadata=final_result.metadata,
             max_attempts=2,
         ),
         final_result=final_result,
+        steps=[
+            AgentStep(
+                step_number=1,
+                tool_name="resume_input",
+                status="success",
+                output_summary="1 experience entries, 1 bullets, 0 skills",
+            ),
+            AgentStep(
+                step_number=2,
+                tool_name="validation",
+                status="success",
+                output_summary="0 validation issues (critical=0, warning=0)",
+                attempt_number=1,
+            ),
+        ],
         attempts=[
             TailoringAttempt(
                 attempt_number=1,
@@ -137,8 +154,12 @@ def test_tailor_agentic_returns_agentic_result_with_dependency_override(
     }
 
     payload = response.json()
-    assert payload["metadata"]["workflow_version"] == "v8"
+    assert payload["metadata"]["workflow_version"] == AGENT_WORKFLOW_VERSION
     assert payload["status"] == "success"
+    assert [step["tool_name"] for step in payload["steps"]] == [
+        "resume_input",
+        "validation",
+    ]
     assert payload["attempts"][0]["status"] == "accepted"
     assert payload["accepted_requirement_ids"] == ["req_1"]
 

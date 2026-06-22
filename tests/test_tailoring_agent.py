@@ -101,6 +101,16 @@ def test_agentic_tailoring_accepts_first_safe_attempt():
     assert result.metadata.max_attempts == DEFAULT_MAX_ATTEMPTS
     assert result.final_result.status == "success"
     assert [attempt.status for attempt in result.attempts] == ["accepted"]
+    assert [step.tool_name for step in result.steps] == [
+        "resume_input",
+        "job_analysis",
+        "evidence_matching",
+        "rewrite_candidate_builder",
+        "rewrite_generation",
+        "validation",
+    ]
+    assert result.steps[-1].status == "success"
+    assert result.steps[-1].attempt_number == 1
     assert calls[0]["feedback"] == []
     assert result.accepted_requirement_ids == ["req_1", "req_2"]
     assert result.missing_requirement_ids == ["req_3"]
@@ -142,6 +152,15 @@ def test_agentic_tailoring_retries_after_validation_failure():
         "rejected",
         "accepted",
     ]
+    assert [step.status for step in result.steps if step.tool_name == "validation"] == [
+        "failed",
+        "success",
+    ]
+    assert [
+        step.attempt_number
+        for step in result.steps
+        if step.tool_name == "rewrite_generation"
+    ] == [1, 2]
     assert result.final_result.status == "success"
     assert result.accepted_requirement_ids == ["req_1", "req_2"]
     assert result.rejected_requirement_ids == ["req_3"]
@@ -209,6 +228,11 @@ def test_agentic_tailoring_returns_no_candidate_result_without_supported_evidenc
     assert result.status == "no_rewrite_candidates"
     assert result.final_result.status == "success"
     assert result.attempts == []
+    assert [step.tool_name for step in result.steps[-2:]] == [
+        "rewrite_generation",
+        "validation",
+    ]
+    assert [step.status for step in result.steps[-2:]] == ["skipped", "skipped"]
     assert result.missing_requirement_ids == ["req_1"]
 
 

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from app.tailoring_agent import tailor_resume_to_job_agentic
+from app.tailoring_agent import AGENT_WORKFLOW_VERSION, tailor_resume_to_job_agentic
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
@@ -76,7 +76,7 @@ def fake_agent_rewrite_provider(candidates, feedback):
     }
 
 
-def test_v8_flow_returns_agentic_trace_without_network_access():
+def test_v9_flow_returns_agentic_tool_trace_without_network_access():
     resume_text = (ROOT_DIR / "data" / "sample_resume.txt").read_text()
     jd_text = (ROOT_DIR / "data" / "sample_jd.txt").read_text()
 
@@ -88,10 +88,22 @@ def test_v8_flow_returns_agentic_trace_without_network_access():
     )
 
     assert result.status == "success"
-    assert result.metadata.workflow_version == "v8"
+    assert result.metadata.workflow_version == AGENT_WORKFLOW_VERSION
     assert result.final_result.status == "success"
     assert result.final_result.validation_issues == []
     assert [attempt.status for attempt in result.attempts] == ["accepted"]
+    assert [step.tool_name for step in result.steps] == [
+        "resume_input",
+        "job_analysis",
+        "evidence_matching",
+        "rewrite_candidate_builder",
+        "rewrite_generation",
+        "validation",
+    ]
+    assert [step.step_number for step in result.steps] == [1, 2, 3, 4, 5, 6]
+    assert result.steps[-1].output_summary == (
+        "0 validation issues (critical=0, warning=0)"
+    )
     assert result.missing_requirement_ids == ["req_5"]
     assert result.accepted_requirement_ids == ["req_1", "req_2", "req_3", "req_4"]
     assert result.rejected_requirement_ids == []

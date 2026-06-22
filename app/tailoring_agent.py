@@ -30,10 +30,19 @@ from app.tailoring import (
 )
 from app.validator import validate_resume_tailoring
 
-AGENT_WORKFLOW_VERSION = "v8"
+AGENT_WORKFLOW_VERSION = "v9"
 DEFAULT_MAX_ATTEMPTS = 2
 
 AgentAttemptStatus = Literal["accepted", "rejected", "output_error"]
+AgentStepStatus = Literal["success", "failed", "skipped"]
+AgentToolName = Literal[
+    "resume_input",
+    "job_analysis",
+    "evidence_matching",
+    "rewrite_candidate_builder",
+    "rewrite_generation",
+    "validation",
+]
 AgenticTailoringStatus = Literal[
     "success",
     "failed_validation",
@@ -60,9 +69,20 @@ class TailoringAttempt(BaseModel):
     message: str | None = None
 
 
+class AgentStep(BaseModel):
+    step_number: int = Field(ge=1)
+    tool_name: AgentToolName
+    status: AgentStepStatus
+    input_summary: str | None = None
+    output_summary: str | None = None
+    message: str | None = None
+    attempt_number: int | None = Field(default=None, ge=1)
+
+
 class AgenticTailoringResult(BaseModel):
     metadata: AgenticTailoringMetadata
     final_result: TailoringResult
+    steps: list[AgentStep] = Field(default_factory=list)
     attempts: list[TailoringAttempt] = Field(default_factory=list)
     missing_requirement_ids: list[str] = Field(default_factory=list)
     accepted_requirement_ids: list[str] = Field(default_factory=list)
@@ -82,20 +102,78 @@ def tailor_resume_to_job_agentic(
     if max_attempts < 1:
         raise ValueError("max_attempts must be at least 1.")
 
+    steps: list[AgentStep] = []
     resume = resume_parser(resume_text)
+    steps.append(
+        _build_step(
+            steps=steps,
+            tool_name="resume_input",
+            status="success",
+            input_summary=_text_input_summary(resume_text),
+            output_summary=_resume_output_summary(resume),
+        )
+    )
+
     job_analysis = analyze_job_description(
         jd_text,
         payload_provider=job_analysis_provider,
     )
+    steps.append(
+        _build_step(
+            steps=steps,
+            tool_name="job_analysis",
+            status="success",
+            input_summary=_text_input_summary(jd_text),
+            output_summary=_job_analysis_output_summary(job_analysis),
+        )
+    )
+
     evidence_matches = match_evidence(resume, job_analysis)
+    steps.append(
+        _build_step(
+            steps=steps,
+            tool_name="evidence_matching",
+            status="success",
+            input_summary=_evidence_matching_input_summary(resume, job_analysis),
+            output_summary=_evidence_matching_output_summary(evidence_matches),
+        )
+    )
+
     missing_requirement_ids = _missing_requirement_ids(evidence_matches)
     candidates = build_rewrite_candidates(
         resume=resume,
         job_analysis=job_analysis,
         evidence_matches=evidence_matches,
     )
+    steps.append(
+        _build_step(
+            steps=steps,
+            tool_name="rewrite_candidate_builder",
+            status="success",
+            input_summary=_rewrite_candidate_input_summary(evidence_matches),
+            output_summary=_rewrite_candidate_output_summary(candidates),
+        )
+    )
 
     if not candidates:
+        steps.append(
+            _build_step(
+                steps=steps,
+                tool_name="rewrite_generation",
+                status="skipped",
+                output_summary="0 rewrite candidates",
+                message="No supported evidence was available for rewrite generation.",
+            )
+        )
+        steps.append(
+            _build_step(
+                steps=steps,
+                tool_name="validation",
+                status="skipped",
+                output_summary="0 validation issues",
+                message="No rewrite suggestions were generated.",
+            )
+        )
         final_result = _build_tailoring_result(
             resume=resume,
             job_analysis=job_analysis,
@@ -105,6 +183,7 @@ def tailor_resume_to_job_agentic(
         )
         return _build_agentic_result(
             final_result=final_result,
+            steps=steps,
             attempts=[],
             missing_requirement_ids=missing_requirement_ids,
             status="no_rewrite_candidates",
@@ -116,11 +195,36 @@ def tailor_resume_to_job_agentic(
     feedback: list[ValidationIssue] = []
 
     for attempt_number in range(1, max_attempts + 1):
+        attempt_feedback = feedback
         try:
-            payload = provider(candidates, feedback)
+            payload = provider(candidates, attempt_feedback)
             rewrite_suggestions = parse_rewrite_payload(payload)
         except RewriteOutputError as error:
             output_issue = _output_error_to_validation_issue(error)
+            steps.append(
+                _build_step(
+                    steps=steps,
+                    tool_name="rewrite_generation",
+                    status="failed",
+                    input_summary=_rewrite_generation_input_summary(
+                        candidates=candidates,
+                        feedback=attempt_feedback,
+                    ),
+                    output_summary="0 rewrite suggestions",
+                    message=str(error),
+                    attempt_number=attempt_number,
+                )
+            )
+            steps.append(
+                _build_step(
+                    steps=steps,
+                    tool_name="validation",
+                    status="skipped",
+                    output_summary="0 validation issues",
+                    message="Rewrite output could not be parsed.",
+                    attempt_number=attempt_number,
+                )
+            )
             feedback = [output_issue]
             attempts.append(
                 TailoringAttempt(
@@ -132,6 +236,20 @@ def tailor_resume_to_job_agentic(
             )
             continue
 
+        steps.append(
+            _build_step(
+                steps=steps,
+                tool_name="rewrite_generation",
+                status="success",
+                input_summary=_rewrite_generation_input_summary(
+                    candidates=candidates,
+                    feedback=attempt_feedback,
+                ),
+                output_summary=_rewrite_generation_output_summary(rewrite_suggestions),
+                attempt_number=attempt_number,
+            )
+        )
+
         validation_issues = _validate_agent_rewrite_attempt(
             resume=resume,
             job_analysis=job_analysis,
@@ -142,6 +260,16 @@ def tailor_resume_to_job_agentic(
         critical_issues = [
             issue for issue in validation_issues if issue.severity == "critical"
         ]
+        steps.append(
+            _build_step(
+                steps=steps,
+                tool_name="validation",
+                status="failed" if critical_issues else "success",
+                input_summary=_validation_input_summary(rewrite_suggestions),
+                output_summary=_validation_output_summary(validation_issues),
+                attempt_number=attempt_number,
+            )
+        )
         attempt_status: AgentAttemptStatus = (
             "rejected" if critical_issues else "accepted"
         )
@@ -164,6 +292,7 @@ def tailor_resume_to_job_agentic(
             )
             return _build_agentic_result(
                 final_result=final_result,
+                steps=steps,
                 attempts=attempts,
                 missing_requirement_ids=missing_requirement_ids,
                 status="success",
@@ -182,6 +311,7 @@ def tailor_resume_to_job_agentic(
     )
     return _build_agentic_result(
         final_result=final_result,
+        steps=steps,
         attempts=attempts,
         missing_requirement_ids=missing_requirement_ids,
         status="failed_validation",
@@ -327,6 +457,7 @@ def _tailoring_status_for_issues(
 
 def _build_agentic_result(
     final_result: TailoringResult,
+    steps: list[AgentStep],
     attempts: list[TailoringAttempt],
     missing_requirement_ids: list[str],
     status: AgenticTailoringStatus,
@@ -354,6 +485,7 @@ def _build_agentic_result(
             max_attempts=max_attempts,
         ),
         final_result=final_result,
+        steps=steps,
         attempts=attempts,
         missing_requirement_ids=missing_requirement_ids,
         accepted_requirement_ids=accepted_requirement_ids,
@@ -379,4 +511,120 @@ def _requirement_ids_from_suggestions(
             for suggestion in suggestions
             for requirement_id in suggestion.requirement_ids
         }
+    )
+
+
+def _build_step(
+    steps: list[AgentStep],
+    tool_name: AgentToolName,
+    status: AgentStepStatus,
+    input_summary: str | None = None,
+    output_summary: str | None = None,
+    message: str | None = None,
+    attempt_number: int | None = None,
+) -> AgentStep:
+    return AgentStep(
+        step_number=len(steps) + 1,
+        tool_name=tool_name,
+        status=status,
+        input_summary=input_summary,
+        output_summary=output_summary,
+        message=message,
+        attempt_number=attempt_number,
+    )
+
+
+def _text_input_summary(text: str) -> str:
+    return f"{len(text.strip())} characters"
+
+
+def _resume_output_summary(resume: Resume) -> str:
+    return (
+        f"{len(resume.experience)} experience entries, "
+        f"{_resume_bullet_count(resume)} bullets, "
+        f"{len(resume.skills)} skills"
+    )
+
+
+def _resume_bullet_count(resume: Resume) -> int:
+    return sum(len(experience.bullets) for experience in resume.experience)
+
+
+def _job_analysis_output_summary(job_analysis: JobAnalysis) -> str:
+    title = job_analysis.job_title or "untitled role"
+    return f"{len(job_analysis.requirements)} requirements for {title}"
+
+
+def _evidence_matching_input_summary(
+    resume: Resume,
+    job_analysis: JobAnalysis,
+) -> str:
+    return (
+        f"{_resume_bullet_count(resume)} bullets against "
+        f"{len(job_analysis.requirements)} requirements"
+    )
+
+
+def _evidence_matching_output_summary(
+    evidence_matches: list[EvidenceMatch],
+) -> str:
+    status_counts = Counter(match.status for match in evidence_matches)
+    return (
+        f"{len(evidence_matches)} matches "
+        f"(strong={status_counts['strong']}, "
+        f"weak={status_counts['weak']}, "
+        f"missing={status_counts['missing']}, "
+        f"uncertain={status_counts['uncertain']})"
+    )
+
+
+def _rewrite_candidate_input_summary(
+    evidence_matches: list[EvidenceMatch],
+) -> str:
+    eligible_match_count = sum(
+        1 for match in evidence_matches if match.status in ("strong", "weak")
+    )
+    return f"{eligible_match_count} evidence matches eligible for rewrite"
+
+
+def _rewrite_candidate_output_summary(
+    candidates: list[RewriteCandidate],
+) -> str:
+    requirement_count = sum(len(candidate.requirements) for candidate in candidates)
+    return f"{len(candidates)} candidates covering {requirement_count} requirements"
+
+
+def _rewrite_generation_input_summary(
+    candidates: list[RewriteCandidate],
+    feedback: list[ValidationIssue],
+) -> str:
+    return (
+        f"{len(candidates)} candidates with {len(feedback)} validation feedback issues"
+    )
+
+
+def _rewrite_generation_output_summary(
+    rewrite_suggestions: list[RewriteSuggestion],
+) -> str:
+    requirement_count = len(_requirement_ids_from_suggestions(rewrite_suggestions))
+    return (
+        f"{len(rewrite_suggestions)} rewrite suggestions covering "
+        f"{requirement_count} requirements"
+    )
+
+
+def _validation_input_summary(
+    rewrite_suggestions: list[RewriteSuggestion],
+) -> str:
+    return f"{len(rewrite_suggestions)} rewrite suggestions"
+
+
+def _validation_output_summary(
+    validation_issues: list[ValidationIssue],
+) -> str:
+    severity_counts = Counter(issue.severity for issue in validation_issues)
+    return (
+        f"{len(validation_issues)} validation issues "
+        f"(critical={severity_counts['critical']}, "
+        f"warning={severity_counts['warning']})"
     )
